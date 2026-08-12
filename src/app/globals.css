@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+/*
+ * Semantic colour tokens. Declaring them in @theme makes Tailwind generate the
+ * matching utilities (bg-surface, text-ink, border-line, …), and because those
+ * utilities compile to `var(--color-*)` the dark-mode block below only has to
+ * restate the variables — no `dark:` variant on every element.
+ */
+@theme {
+  --color-canvas: #f6f6f7;
+  --color-surface: #ffffff;
+  --color-line: #e4e4e7;
+  --color-ink: #18181b;
+  --color-muted: #6b7280;
+  --color-brand: #ef4444;
+  --color-study: #2563eb;
+  --color-fun: #f59e0b;
+  --color-other: #8b5cf6;
+  --color-skip: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #0b0b0d;
+    --color-surface: #17171b;
+    --color-line: #2a2a30;
+    --color-ink: #fafafa;
+    --color-muted: #9ca3af;
+  }
+}
+
+html,
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+  }
+}

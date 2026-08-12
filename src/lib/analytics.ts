@@ -1,0 +1,369 @@
+import { query } from './db';
+import { mergeIntervals, unionLength } from './intervals';
+import type { Category, DayStats, HistoryRow, Interval } from './types';
+import { buildIntervals, computeWatchStats, type RawEvent } from './watch-time';
+
+/**
+ * Analytics is deliberately separated from playback: nothing here runs in the
+ * browser, and the player never waits on it. Everything is derived from the raw
+ * `watch_events` log at read time, so improving the algorithm improves history
+ * retroactively with no migration.
+ *
+ * Sessions are small (tens of events) and a week is tens of sessions, so
+ * replaying them per request is cheap. If a user's history ever outgrows that,
+ * the fix is a materialised `session_stats` table — the shape of this module
+ * would not change.
+ */
+
+/** A study video counts as "completed" once this much of it has been watched. */
+const COMPLETION_THRESHOLD = 0.9;
+
+export interface SessionRecord {
+  sessionId: number;
+  videoId: number;
+  youtubeVideoId: string;
+  title: string;
+  channelName: string;
+  durationSeconds: number;
+  category: Category;
+  startedAt: Date;
+  endedAt: Date | null;
+  /** Wall-clock seconds the session was open on our site. */
+  elapsedSeconds: number;
+  intervals: Interval[];
+  reachedEnd: boolean;
+}
+
+interface SessionRow {
+  session_id: string;
+  video_id: string;
+  youtube_video_id: string;
+  title: string;
+  channel_name: string;
+  duration_seconds: number;
+  category: string;
+  started_at: Date;
+  ended_at: Date | null;
+}
+
+interface EventRow {
+  session_id: string;
+  event_type: string;
+  video_time: string | number;
+  previous_video_time: string | number | null;
+  timestamp: Date;
+}
+
+/**
+ * Loads every session in `[since, until)` together with its replayed intervals.
+ * Two queries total, regardless of how many sessions come back.
+ */
+export async function loadSessions(
+  userId: number,
+  since: Date,
+  until: Date,
+): Promise<SessionRecord[]> {
+  const sessionRows = await query<SessionRow>(
+    `SELECT s.id            AS session_id,
+            v.id            AS video_id,
+            v.youtube_video_id,
+            v.title,
+            v.channel_name,
+            v.duration_seconds,
+            v.category,
+            s.started_at,
+            s.ended_at
+       FROM watch_sessions s
+       JOIN videos v ON v.id = s.video_id
+      WHERE s.user_id = $1
+        AND s.started_at >= $2
+        AND s.started_at < $3
+      ORDER BY s.started_at ASC`,
+    [userId, since, until],
+  );
+
+  if (sessionRows.length === 0) return [];
+
+  const sessionIds = sessionRows.map((r) => Number(r.session_id));
+  const eventRows = await query<EventRow>(
+    `SELECT session_id, event_type, video_time, previous_video_time, timestamp
+       FROM watch_events
+      WHERE session_id = ANY($1::bigint[])
+      ORDER BY timestamp ASC, id ASC`,
+    [sessionIds],
+  );
+
+  const eventsBySession = new Map<number, RawEvent[]>();
+  for (const row of eventRows) {
+    const id = Number(row.session_id);
+    const list = eventsBySession.get(id) ?? [];
+    list.push({
+      type: row.event_type as RawEvent['type'],
+      videoTime: Number(row.video_time),
+      previousVideoTime:
+        row.previous_video_time === null ? null : Number(row.previous_video_time),
+      timestamp: row.timestamp.getTime(),
+    });
+    eventsBySession.set(id, list);
+  }
+
+  return sessionRows.map((row) => {
+    const sessionId = Number(row.session_id);
+    const events = eventsBySession.get(sessionId) ?? [];
+    const { intervals, reachedEnd } = buildIntervals(events);
+
+    // Prefer the recorded end; fall back to the last event so a session whose
+    // tab was killed still contributes a sane wall-clock figure.
+    const lastEventAt = events.length > 0 ? events[events.length - 1].timestamp : null;
+    const endMs = row.ended_at?.getTime() ?? lastEventAt ?? row.started_at.getTime();
+
+    return {
+      sessionId,
+      videoId: Number(row.video_id),
+      youtubeVideoId: row.youtube_video_id,
+      title: row.title,
+      channelName: row.channel_name,
+      durationSeconds: Number(row.duration_seconds),
+      category: row.category as Category,
+      startedAt: row.started_at,
+      endedAt: row.ended_at,
+      elapsedSeconds: Math.max(0, (endMs - row.started_at.getTime()) / 1000),
+      intervals,
+      reachedEnd,
+    };
+  });
+}
+
+/** `YYYY-MM-DD` for `date` as seen in `timeZone`. `en-CA` formats ISO-style. */
+export function dateKeyInZone(date: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    // An unknown IANA zone from a spoofed client must not 500 the dashboard.
+    return new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  }
+}
+
+/**
+ * Rolls sessions up per local day.
+ *
+ * Intervals are merged per (day, video) before counting, so rewatching the same
+ * five minutes three times in one afternoon is five minutes of watch time, not
+ * fifteen. `skipped` stays per-video for the same reason.
+ */
+export function summarizeByDay(
+  sessions: SessionRecord[],
+  dates: string[],
+  timeZone: string,
+): DayStats[] {
+  interface Bucket {
+    totalYoutubeSeconds: number;
+    byVideo: Map<
+      number,
+      { durationSeconds: number; category: Category; intervals: Interval[]; reachedEnd: boolean }
+    >;
+  }
+
+  const buckets = new Map<string, Bucket>();
+  for (const date of dates) {
+    buckets.set(date, { totalYoutubeSeconds: 0, byVideo: new Map() });
+  }
+
+  for (const session of sessions) {
+    const key = dateKeyInZone(session.startedAt, timeZone);
+    const bucket = buckets.get(key);
+    if (!bucket) continue; // outside the requested window
+
+    bucket.totalYoutubeSeconds += session.elapsedSeconds;
+
+    const existing = bucket.byVideo.get(session.videoId);
+    if (existing) {
+      existing.intervals.push(...session.intervals);
+      existing.reachedEnd = existing.reachedEnd || session.reachedEnd;
+    } else {
+      bucket.byVideo.set(session.videoId, {
+        durationSeconds: session.durationSeconds,
+        category: session.category,
+        intervals: [...session.intervals],
+        reachedEnd: session.reachedEnd,
+      });
+    }
+  }
+
+  return dates.map((date) => {
+    const bucket = buckets.get(date)!;
+
+    let watchedSeconds = 0;
+    let skippedSeconds = 0;
+    let studySeconds = 0;
+    let entertainmentSeconds = 0;
+    let otherSeconds = 0;
+    let studyVideoCount = 0;
+    let completedStudyVideoCount = 0;
+    let percentageSum = 0;
+
+    for (const video of bucket.byVideo.values()) {
+      const stats = computeWatchStats(video.intervals, video.durationSeconds, video.reachedEnd);
+
+      watchedSeconds += stats.watchedSeconds;
+      skippedSeconds += stats.skippedSeconds;
+      percentageSum += stats.watchedPercentage;
+
+      if (video.category === 'STUDY') {
+        studySeconds += stats.watchedSeconds;
+        studyVideoCount += 1;
+        if (stats.reachedEnd || stats.watchedPercentage >= COMPLETION_THRESHOLD) {
+          completedStudyVideoCount += 1;
+        }
+      } else if (video.category === 'ENTERTAINMENT') {
+        entertainmentSeconds += stats.watchedSeconds;
+      } else {
+        otherSeconds += stats.watchedSeconds;
+      }
+    }
+
+    const videoCount = bucket.byVideo.size;
+
+    return {
+      date,
+      totalYoutubeSeconds: Math.round(bucket.totalYoutubeSeconds),
+      watchedSeconds: Math.round(watchedSeconds),
+      skippedSeconds: Math.round(skippedSeconds),
+      studySeconds: Math.round(studySeconds),
+      entertainmentSeconds: Math.round(entertainmentSeconds),
+      otherSeconds: Math.round(otherSeconds),
+      videoCount,
+      studyVideoCount,
+      completedStudyVideoCount,
+      averageWatchedPercentage: videoCount > 0 ? percentageSum / videoCount : 0,
+    } satisfies DayStats;
+  });
+}
+
+/**
+ * All-time per-video history, newest first.
+ *
+ * Intervals from every session for a video are merged before counting, so a
+ * video watched across three sittings reports unique coverage rather than the
+ * sum of three overlapping attempts.
+ */
+export async function loadHistory(userId: number, limit = 100): Promise<HistoryRow[]> {
+  const veryOld = new Date(0);
+  const future = new Date(Date.now() + 86_400_000);
+  const sessions = await loadSessions(userId, veryOld, future);
+
+  interface Aggregate {
+    youtubeVideoId: string;
+    title: string;
+    channelName: string;
+    durationSeconds: number;
+    category: Category;
+    intervals: Interval[];
+    reachedEnd: boolean;
+    lastWatchedAt: Date;
+    sessionCount: number;
+  }
+
+  const byVideo = new Map<number, Aggregate>();
+
+  for (const session of sessions) {
+    const existing = byVideo.get(session.videoId);
+    if (existing) {
+      existing.intervals.push(...session.intervals);
+      existing.reachedEnd = existing.reachedEnd || session.reachedEnd;
+      existing.sessionCount += 1;
+      if (session.startedAt > existing.lastWatchedAt) existing.lastWatchedAt = session.startedAt;
+    } else {
+      byVideo.set(session.videoId, {
+        youtubeVideoId: session.youtubeVideoId,
+        title: session.title,
+        channelName: session.channelName,
+        durationSeconds: session.durationSeconds,
+        category: session.category,
+        intervals: [...session.intervals],
+        reachedEnd: session.reachedEnd,
+        lastWatchedAt: session.startedAt,
+        sessionCount: 1,
+      });
+    }
+  }
+
+  return [...byVideo.values()]
+    .map((video) => {
+      const stats = computeWatchStats(video.intervals, video.durationSeconds, video.reachedEnd);
+      return {
+        youtubeVideoId: video.youtubeVideoId,
+        title: video.title,
+        channelName: video.channelName,
+        durationSeconds: video.durationSeconds,
+        category: video.category,
+        watchedSeconds: Math.round(stats.watchedSeconds),
+        skippedSeconds: Math.round(stats.skippedSeconds),
+        watchedPercentage: stats.watchedPercentage,
+        reachedEnd: stats.reachedEnd,
+        lastWatchedAt: video.lastWatchedAt.toISOString(),
+        sessionCount: video.sessionCount,
+      } satisfies HistoryRow;
+    })
+    .sort((a, b) => b.lastWatchedAt.localeCompare(a.lastWatchedAt))
+    .slice(0, limit);
+}
+
+/**
+ * How far into a video the user got, so a returning viewer can resume.
+ * Uses the merged coverage rather than the last raw position — the point they
+ * stopped *watching*, not the point they last scrubbed to.
+ */
+export async function lastPositionFor(
+  userId: number,
+  youtubeVideoId: string,
+): Promise<number | null> {
+  const rows = await query<{ session_id: string }>(
+    `SELECT s.id AS session_id
+       FROM watch_sessions s
+       JOIN videos v ON v.id = s.video_id
+      WHERE s.user_id = $1 AND v.youtube_video_id = $2
+      ORDER BY s.started_at DESC
+      LIMIT 5`,
+    [userId, youtubeVideoId],
+  );
+  if (rows.length === 0) return null;
+
+  const eventRows = await query<EventRow>(
+    `SELECT session_id, event_type, video_time, previous_video_time, timestamp
+       FROM watch_events
+      WHERE session_id = ANY($1::bigint[])
+      ORDER BY timestamp ASC, id ASC`,
+    [rows.map((r) => Number(r.session_id))],
+  );
+
+  const bySession = new Map<number, RawEvent[]>();
+  for (const row of eventRows) {
+    const id = Number(row.session_id);
+    const list = bySession.get(id) ?? [];
+    list.push({
+      type: row.event_type as RawEvent['type'],
+      videoTime: Number(row.video_time),
+      previousVideoTime: row.previous_video_time === null ? null : Number(row.previous_video_time),
+      timestamp: row.timestamp.getTime(),
+    });
+    bySession.set(id, list);
+  }
+
+  const all: Interval[] = [];
+  for (const events of bySession.values()) all.push(...buildIntervals(events).intervals);
+
+  const merged = mergeIntervals(all);
+  if (merged.length === 0 || unionLength(merged) < 30) return null;
+
+  return Math.floor(merged[merged.length - 1].end);
+}
