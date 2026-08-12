@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 /**
- * StudyTrace serves only the website and small JSON APIs.
+ * WatchLens serves only the website and small JSON APIs.
  * Video bytes never touch this server — the YouTube IFrame embed loads
  * youtube.com directly in the user's browser.
  */

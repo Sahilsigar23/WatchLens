@@ -36,9 +36,9 @@ export function Nav({ email }: { email: string | null }) {
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-sm font-bold text-white">
-            S
+            W
           </span>
-          <span className="text-base font-semibold tracking-tight">StudyTrace</span>
+          <span className="text-base font-semibold tracking-tight">WatchLens</span>
         </Link>
 
         <nav className="order-3 flex w-full items-center gap-1 text-sm sm:order-none sm:w-auto">

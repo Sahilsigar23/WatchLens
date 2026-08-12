@@ -3,7 +3,7 @@
  * Player API.
  *
  * Nothing here touches video bytes. The IFrame embed talks to youtube.com
- * directly from the browser; StudyTrace only ever sees player *events*.
+ * directly from the browser; WatchLens only ever sees player *events*.
  */
 
 /**

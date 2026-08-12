@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { PLAYER_PREFS_KEY } from '@/lib/player-state';
 import { loadYouTubeApi, type PlayerSource, type YouTubePlayer as Player } from '@/lib/youtube';
 
 /** Reported alongside a video change so callers can keep their index in step. */
@@ -24,8 +25,12 @@ interface YouTubePlayerProps {
   onVideoChange: (change: VideoChange) => void;
 }
 
-/** Volume and speed survive a hard reload; the player object cannot. */
-const PREFS_KEY = 'studytrace.player.prefs';
+/**
+ * Volume and speed survive a hard reload; the player object cannot.
+ * The key is imported rather than repeated so it cannot drift from the copy
+ * that `clearPlayerState` erases — which is exactly what a rename would do.
+ */
+const PREFS_KEY = PLAYER_PREFS_KEY;
 
 interface PlayerPrefs {
   volume?: number;

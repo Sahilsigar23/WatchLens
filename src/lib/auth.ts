@@ -17,7 +17,7 @@ import { queryOne } from './db';
  * the app only depends on `getCurrentUserId()`, so the swap is contained.
  */
 
-const COOKIE_NAME = 'studytrace_session';
+const COOKIE_NAME = 'watchlens_session';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
 
 function secret(): string {

@@ -49,7 +49,7 @@ export function SignInCard() {
   return (
     <div className="mx-auto max-w-md space-y-4 pt-10">
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">StudyTrace</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">WatchLens</h1>
         <p className="text-sm text-muted">
           See how much of each YouTube video you actually watched — not how much of it played.
         </p>

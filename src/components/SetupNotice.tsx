@@ -7,7 +7,7 @@ export function SetupNotice({ detail }: { detail?: string }) {
     <div className="mx-auto max-w-xl space-y-4 pt-10">
       <h1 className="text-2xl font-semibold tracking-tight">Almost there</h1>
       <p className="text-sm text-muted">
-        StudyTrace needs a database and a session secret before it can run.
+        WatchLens needs a database and a session secret before it can run.
       </p>
 
       <ol className="card space-y-3 p-5 text-sm">

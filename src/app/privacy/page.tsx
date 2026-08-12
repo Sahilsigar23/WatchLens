@@ -33,7 +33,7 @@ export default async function PrivacyPage() {
       <header className="space-y-1.5">
         <h1 className="text-xl font-semibold tracking-tight">Privacy &amp; tracking</h1>
         <p className="text-sm text-muted">
-          StudyTrace only measures videos you deliberately open on this site. Everything it records
+          WatchLens only measures videos you deliberately open on this site. Everything it records
           is listed below — there is no hidden collection.
         </p>
       </header>

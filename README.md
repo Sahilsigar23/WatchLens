@@ -1,9 +1,9 @@
-# StudyTrace
+# WatchLens
 
 **A YouTube learning-time tracker that measures what you actually watched, not what played.**
 
 Open a 60-minute lecture, watch two minutes, drag the scrubber to 55:00 and let it finish, and
-YouTube's own history makes it look like you watched the whole hour. StudyTrace reconstructs the
+YouTube's own history makes it look like you watched the whole hour. WatchLens reconstructs the
 real picture:
 
 ```
@@ -22,7 +22,7 @@ User Browser
      │
      ├──────────────►  YouTube          (video streaming — direct, never proxied)
      │
-     └──────────────►  StudyTrace       (small JSON batches of player events)
+     └──────────────►  WatchLens       (small JSON batches of player events)
 ```
 
 Video bytes go straight from YouTube's CDN to the browser through the official IFrame Player API.
@@ -108,7 +108,7 @@ index and position are mirrored to `localStorage` and the video reopens where yo
 
 ## Your data belongs to your account
 
-Everything StudyTrace records is stored in Postgres against the authenticated
+Everything WatchLens records is stored in Postgres against the authenticated
 `user_id` — never in the browser. Sign out, clear the browser, switch to your phone: sign back in
 and it is all still there.
 
@@ -143,7 +143,7 @@ no endpoint that takes a user id as a parameter, so there is nothing to tamper w
 assertions that neither can see or write the other's rows. It skips when `DATABASE_URL` is unset:
 
 ```bash
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/studytrace npm test
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/watchlens npm test
 ```
 
 Video and playlist *metadata* (title, channel, duration, the playlist's contents) is deliberately
@@ -171,8 +171,8 @@ No separate backend service. No ORM. No auth library. The MVP stays small on pur
 **Requirements:** Node 20+ and any PostgreSQL database (local, Neon, Supabase, RDS…).
 
 ```bash
-git clone https://github.com/Sahilsigar23/StudyTrace.git
-cd StudyTrace
+git clone https://github.com/Sahilsigar23/WatchLens.git
+cd WatchLens
 npm install
 cp .env.example .env.local
 ```
@@ -180,7 +180,7 @@ cp .env.example .env.local
 Fill in `.env.local`:
 
 ```bash
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/studytrace
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/watchlens
 PGSSL=false
 SESSION_SECRET=<paste a long random string>
 YOUTUBE_API_KEY=            # optional, only for the search box

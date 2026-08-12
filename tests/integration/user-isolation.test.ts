@@ -14,9 +14,9 @@ import { loadLifetimeTotals, loadResumePoint, loadUserPlaylists } from '@/lib/us
  * what the mock was told to return. They skip when DATABASE_URL is unset so
  * `npm test` stays runnable with no infrastructure.
  *
- *   docker run -d -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=studytrace \
+ *   docker run -d -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=watchlens \
  *     -p 55432:5432 postgres:16-alpine
- *   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/studytrace npm test
+ *   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/watchlens npm test
  */
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);

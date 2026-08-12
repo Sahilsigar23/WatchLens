@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- StudyTrace schema
+-- WatchLens schema
 --
 -- Run with:  npm run db:migrate
 -- Or paste straight into psql / the Neon / Supabase SQL editor.

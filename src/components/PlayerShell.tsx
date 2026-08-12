@@ -383,7 +383,7 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
           <div className="card flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
             <p className="text-lg font-medium">Paste a YouTube link to start</p>
             <p className="max-w-md text-sm text-muted">
-              A video or a whole playlist. StudyTrace measures how much of each one you actually
+              A video or a whole playlist. WatchLens measures how much of each one you actually
               played — fast-forwarded parts do not count.
             </p>
           </div>

@@ -10,8 +10,15 @@
  * video someone watched is itself information about them.
  */
 
-export const PLAYER_STATE_KEY = 'studytrace.player.state';
-const PLAYER_PREFS_KEY = 'studytrace.player.prefs';
+export const PLAYER_STATE_KEY = 'watchlens.player.state';
+export const PLAYER_PREFS_KEY = 'watchlens.player.prefs';
+
+/**
+ * Keys written before the project was renamed from StudyTrace. Nothing reads
+ * them any more, so they would sit in every existing user's browser forever;
+ * clearing them alongside the current ones sweeps them up on the next sign-in.
+ */
+const LEGACY_KEYS = ['studytrace.player.state', 'studytrace.player.prefs'];
 
 export interface StoredPlayerState {
   videoId: string | null;
@@ -48,8 +55,9 @@ export function writePlayerState(state: StoredPlayerState): void {
  */
 export function clearPlayerState(): void {
   try {
-    localStorage.removeItem(PLAYER_STATE_KEY);
-    localStorage.removeItem(PLAYER_PREFS_KEY);
+    for (const key of [PLAYER_STATE_KEY, PLAYER_PREFS_KEY, ...LEGACY_KEYS]) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // Nothing to do; the server-side resume point still governs what loads.
   }

@@ -7,7 +7,7 @@ import Link from 'next/link';
 export function TrackingNotice() {
   return (
     <div className="card p-4 text-sm">
-      <p className="font-medium">While a video plays, StudyTrace records:</p>
+      <p className="font-medium">While a video plays, WatchLens records:</p>
       <p className="mt-1 text-muted">
         the video id, title, channel and length; play, pause, seek and end events with their
         positions; whether this tab is in the foreground; and when the session started and ended.

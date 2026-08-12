@@ -7,7 +7,7 @@ import { getCurrentUser } from '@/lib/auth';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'StudyTrace — YouTube Learning Time Tracker',
+  title: 'WatchLens — YouTube Learning Time Tracker',
   description:
     'Watch YouTube here and see how much of each video you actually watched, not how much of it played.',
 };

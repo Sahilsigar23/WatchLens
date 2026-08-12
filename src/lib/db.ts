@@ -12,7 +12,7 @@ import { Pool, type QueryResultRow } from 'pg';
 
 declare global {
   // eslint-disable-next-line no-var
-  var __studytracePool: Pool | undefined;
+  var __watchlensPool: Pool | undefined;
 }
 
 function createPool(): Pool {
@@ -32,8 +32,8 @@ function createPool(): Pool {
 
 /** Reused across hot reloads in dev so `next dev` does not leak a pool per edit. */
 export function getPool(): Pool {
-  if (!global.__studytracePool) global.__studytracePool = createPool();
-  return global.__studytracePool;
+  if (!global.__watchlensPool) global.__watchlensPool = createPool();
+  return global.__watchlensPool;
 }
 
 /**
