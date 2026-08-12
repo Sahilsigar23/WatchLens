@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { PlayerShell } from '@/components/PlayerShell';
@@ -53,6 +54,7 @@ export function usePlayerCommands(): PlayerCommands {
  * untouched because it lives here rather than inside any page.
  */
 export function AppShell({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
+  const pathname = usePathname();
   const [version, setVersion] = useState(0);
   const [request, setRequest] = useState<PlayerRequest | null>(null);
 
@@ -70,9 +72,16 @@ export function AppShell({ signedIn, children }: { signedIn: boolean; children: 
   return (
     <StatsRefreshContext.Provider value={version}>
       <PlayerCommandContext.Provider value={commands}>
-        <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+        {/* pb-28 on mobile clears the fixed bottom tab bar. */}
+        <div className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 md:pb-16">
           {signedIn && <PlayerShell onSessionChange={bump} request={request} />}
-          <main>{children}</main>
+          {/*
+            Keyed by route so the section fades up on each navigation. Only
+            `main` is keyed — the player is a sibling and is never touched.
+          */}
+          <main key={pathname} className="animate-rise">
+            {children}
+          </main>
         </div>
       </PlayerCommandContext.Provider>
     </StatsRefreshContext.Provider>

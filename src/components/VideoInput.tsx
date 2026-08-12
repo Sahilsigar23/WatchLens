@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { Icon } from '@/components/Icon';
 import { parsePlaylistId, parseVideoId } from '@/lib/youtube';
 
 interface SearchResult {
@@ -13,6 +14,8 @@ interface SearchResult {
 export interface VideoInputProps {
   onSelectVideo: (videoId: string) => void;
   onSelectPlaylist: (playlistId: string) => void;
+  /** Larger, centred treatment for the empty state. */
+  size?: 'default' | 'hero';
 }
 
 /**
@@ -22,7 +25,7 @@ export interface VideoInputProps {
  * YouTube itself does and what the user almost always means. Search needs
  * YOUTUBE_API_KEY; links always work without one.
  */
-export function VideoInput({ onSelectVideo, onSelectPlaylist }: VideoInputProps) {
+export function VideoInput({ onSelectVideo, onSelectPlaylist, size = 'default' }: VideoInputProps) {
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -57,10 +60,7 @@ export function VideoInput({ onSelectVideo, onSelectPlaylist }: VideoInputProps)
     setMessage(null);
     try {
       const response = await fetch(`/api/search?q=${encodeURIComponent(input)}`);
-      const data = (await response.json()) as {
-        results?: SearchResult[];
-        message?: string;
-      };
+      const data = (await response.json()) as { results?: SearchResult[]; message?: string };
       setResults(data.results ?? []);
       setMessage(data.message ?? (data.results?.length ? null : 'No videos found.'));
     } catch {
@@ -78,20 +78,23 @@ export function VideoInput({ onSelectVideo, onSelectPlaylist }: VideoInputProps)
   };
 
   return (
-    <div className="space-y-3">
-      <form onSubmit={submit} className="flex gap-2">
+    <div className={size === 'hero' ? 'mx-auto w-full max-w-xl space-y-3' : 'space-y-3'}>
+      <form onSubmit={submit} className="relative flex items-center gap-2">
+        <span className="pointer-events-none absolute left-4 text-muted">
+          <Icon name="search" size={17} />
+        </span>
         <input
           type="text"
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          placeholder="Paste a YouTube video or playlist link, or search…"
+          placeholder="Paste a YouTube video or playlist link…"
           aria-label="YouTube video link, playlist link, or search query"
-          className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm outline-none placeholder:text-muted focus:border-brand"
+          className={`input pl-11 ${size === 'hero' ? 'py-3.5' : ''}`}
         />
         <button
           type="submit"
-          disabled={searching}
-          className="shrink-0 rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          disabled={searching || value.trim() === ''}
+          className="btn btn-primary absolute right-1.5 py-2"
         >
           {searching ? 'Searching…' : 'Watch'}
         </button>
@@ -106,14 +109,14 @@ export function VideoInput({ onSelectVideo, onSelectPlaylist }: VideoInputProps)
               <button
                 type="button"
                 onClick={() => pick(result.videoId)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas"
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raised"
               >
                 {/* Thumbnail comes straight from YouTube's CDN, not our server. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://i.ytimg.com/vi/${result.videoId}/mqdefault.jpg`}
                   alt=""
-                  className="h-12 w-20 shrink-0 rounded-md object-cover"
+                  className="h-12 w-20 shrink-0 rounded-lg object-cover"
                   loading="lazy"
                 />
                 <span className="min-w-0">

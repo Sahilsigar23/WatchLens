@@ -1,26 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import { CategoryBadge } from '@/components/CategoryBadge';
+import { usePlayerCommands } from '@/components/AppShell';
+import { Icon } from '@/components/Icon';
 import { formatDuration, formatPercentage } from '@/lib/format';
-import type { HistoryRow } from '@/lib/types';
+import type { Category, HistoryRow } from '@/lib/types';
+
+type Filter = 'ALL' | Category;
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'ALL', label: 'All' },
+  { key: 'STUDY', label: 'Study' },
+  { key: 'ENTERTAINMENT', label: 'Entertainment' },
+  { key: 'OTHER', label: 'Other' },
+];
 
 /**
- * Every video ever watched here, newest first.
+ * Watch history as a media library rather than a table.
  *
  * Figures are all-time per video: sessions are merged before counting, so a
  * lecture watched over three evenings shows unique coverage rather than the sum
  * of three overlapping attempts.
  */
 export function HistoryTable() {
+  const router = useRouter();
+  const { openVideo } = usePlayerCommands();
+
+  /** Loads the video into the persistent player, then shows the Watch page. */
+  const watchAgain = (videoId: string) => {
+    openVideo(videoId);
+    router.push('/');
+  };
+
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [filter, setFilter] = useState<Filter>('ALL');
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/api/history')
+    fetch('/api/user/history')
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json() as Promise<{ videos: HistoryRow[] }>;
@@ -37,125 +59,144 @@ export function HistoryTable() {
     };
   }, []);
 
+  const counts = useMemo(() => {
+    const base: Record<Filter, number> = { ALL: 0, STUDY: 0, ENTERTAINMENT: 0, OTHER: 0 };
+    for (const row of rows ?? []) {
+      base.ALL += 1;
+      base[row.category] += 1;
+    }
+    return base;
+  }, [rows]);
+
+  const visible = (rows ?? []).filter((row) => filter === 'ALL' || row.category === filter);
+
   if (failed) {
     return <p className="card p-6 text-sm text-muted">Could not load history. Try reloading.</p>;
   }
 
-  if (rows === null) {
-    return <p className="card p-6 text-sm text-muted">Loading history…</p>;
-  }
-
-  if (rows.length === 0) {
-    return (
-      <p className="card p-6 text-sm text-muted">
-        Nothing here yet. Watch a video on the Watch page and it will appear.
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {/* Cards on small screens, a table from `sm` up — the same data either way. */}
-      <div className="space-y-3 sm:hidden">
-        {rows.map((row) => (
-          <article key={row.youtubeVideoId} className="card space-y-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="truncate text-sm font-medium">{row.title || row.youtubeVideoId}</h3>
-                <p className="truncate text-xs text-muted">{row.channelName}</p>
-              </div>
-              <CategoryBadge category={row.category} />
-            </div>
-            <CoverageBar row={row} />
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <Pair label="Duration" value={formatDuration(row.durationSeconds)} />
-              <Pair label="Actual watched" value={formatDuration(row.watchedSeconds)} />
-              <Pair label="Skipped" value={formatDuration(row.skippedSeconds)} />
-              <Pair label="Completion" value={formatPercentage(row.watchedPercentage)} />
-            </dl>
-            <p className="text-xs text-muted">{formatDate(row.lastWatchedAt)}</p>
-          </article>
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            aria-pressed={filter === option.key}
+            onClick={() => setFilter(option.key)}
+            className="chip"
+          >
+            {option.label}
+            {rows && <span className="text-muted">{counts[option.key]}</span>}
+          </button>
         ))}
       </div>
 
-      <div className="card hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[46rem] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-4 py-3 font-medium">Video</th>
-              <th className="px-4 py-3 font-medium">Category</th>
-              <th className="px-4 py-3 text-right font-medium">Duration</th>
-              <th className="px-4 py-3 text-right font-medium">Watched</th>
-              <th className="px-4 py-3 text-right font-medium">Skipped</th>
-              <th className="px-4 py-3 text-right font-medium">%</th>
-              <th className="px-4 py-3 text-right font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.youtubeVideoId} className="border-b border-line last:border-0">
-                <td className="max-w-[22rem] px-4 py-3">
-                  <p className="truncate font-medium">{row.title || row.youtubeVideoId}</p>
-                  <p className="truncate text-xs text-muted">{row.channelName}</p>
-                  <div className="mt-1.5 max-w-[16rem]">
-                    <CoverageBar row={row} />
+      {rows === null ? (
+        <ul className="space-y-3">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="skeleton h-[5.5rem] w-full" />
+          ))}
+        </ul>
+      ) : visible.length === 0 ? (
+        <p className="card p-8 text-center text-sm text-muted">
+          {rows.length === 0
+            ? 'Nothing here yet. Watch something and it will appear.'
+            : 'No videos in this category.'}
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {visible.map((row) => (
+            <li key={row.youtubeVideoId}>
+              <article className="card card-hover overflow-hidden">
+                <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
+                  <button
+                    type="button"
+                    onClick={() => watchAgain(row.youtubeVideoId)}
+                    className="group relative h-[3.9rem] w-[6.9rem] shrink-0 overflow-hidden rounded-xl sm:h-20 sm:w-36"
+                    aria-label={`Watch ${row.title || row.youtubeVideoId} again`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://i.ytimg.com/vi/${row.youtubeVideoId}/mqdefault.jpg`}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    <span className="absolute inset-0 grid place-items-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      <Icon name="play" size={18} />
+                    </span>
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-medium sm:text-base">
+                          {row.title || row.youtubeVideoId}
+                        </h3>
+                        <p className="truncate text-xs text-muted">{row.channelName}</p>
+                      </div>
+                      <CategoryBadge category={row.category} />
+                    </div>
+
+                    <div className="mt-2.5 flex h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+                      <div
+                        className="animate-grow h-full"
+                        style={{
+                          width: `${pct(row.watchedSeconds, row.durationSeconds)}%`,
+                          backgroundImage:
+                            'linear-gradient(90deg, var(--color-brand), var(--color-accent))',
+                        }}
+                      />
+                      <div
+                        className="h-full"
+                        style={{
+                          width: `${pct(row.skippedSeconds, row.durationSeconds)}%`,
+                          background: 'var(--color-skip)',
+                        }}
+                      />
+                    </div>
+
+                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <span className="text-ink">
+                        <span className="stat font-semibold">
+                          {formatDuration(row.watchedSeconds)}
+                        </span>
+                        {row.durationSeconds > 0 && ` / ${formatDuration(row.durationSeconds)}`}
+                      </span>
+                      <span>·</span>
+                      <span>{formatPercentage(row.watchedPercentage)} actual</span>
+                      {row.skippedSeconds > 0 && (
+                        <>
+                          <span>·</span>
+                          <span>{formatDuration(row.skippedSeconds)} skipped</span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>{relativeDate(row.lastWatchedAt)}</span>
+                    </p>
                   </div>
-                </td>
-                <td className="px-4 py-3">
-                  <CategoryBadge category={row.category} />
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {formatDuration(row.durationSeconds)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {formatDuration(row.watchedSeconds)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted">
-                  {formatDuration(row.skippedSeconds)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {formatPercentage(row.watchedPercentage)}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-muted">
-                  {formatDate(row.lastWatchedAt)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </article>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function CoverageBar({ row }: { row: HistoryRow }) {
-  const pct = (value: number) =>
-    row.durationSeconds > 0 ? (value / row.durationSeconds) * 100 : 0;
-
-  return (
-    <div
-      className="flex h-1.5 w-full overflow-hidden rounded-full bg-canvas"
-      title={`${formatDuration(row.watchedSeconds)} watched, ${formatDuration(row.skippedSeconds)} skipped`}
-    >
-      <div style={{ width: `${pct(row.watchedSeconds)}%`, background: 'var(--color-brand)' }} />
-      <div style={{ width: `${pct(row.skippedSeconds)}%`, background: 'var(--color-skip)' }} />
-    </div>
-  );
+function pct(value: number, duration: number): number {
+  return duration > 0 ? Math.min(100, (value / duration) * 100) : 0;
 }
 
-function Pair({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-muted">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
-    </div>
-  );
-}
+/** "Today" / "Yesterday" read better than a date for anything recent. */
+function relativeDate(iso: string): string {
+  const then = new Date(iso);
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86_400_000);
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }

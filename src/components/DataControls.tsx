@@ -58,7 +58,7 @@ export function DataControls() {
           <button
             type="button"
             onClick={() => setPending('account')}
-            className="rounded-lg border border-line px-3 py-2 text-sm text-brand transition-colors hover:border-brand"
+            className="rounded-lg border border-line px-3 py-2 text-sm text-danger transition-colors hover:border-brand"
           >
             Delete account and all data
           </button>

@@ -1,48 +1,266 @@
 @import 'tailwindcss';
 
 /*
- * Semantic colour tokens. Declaring them in @theme makes Tailwind generate the
- * matching utilities (bg-surface, text-ink, border-line, …), and because those
- * utilities compile to `var(--color-*)` the dark-mode block below only has to
- * restate the variables — no `dark:` variant on every element.
+ * WatchLens design tokens — dark first.
+ *
+ * The dark palette is the default in @theme; the light block below restates
+ * only the surface/text variables for people whose system asks for light. Every
+ * component reads the same `bg-surface` / `text-ink` / `border-line` utilities,
+ * so neither theme needs a `dark:` variant anywhere.
+ *
+ * Identity: indigo → cyan, a "lens" gradient. Deliberately not YouTube red —
+ * YouTube is the video source, WatchLens is the product around it.
  */
 @theme {
-  --color-canvas: #f6f6f7;
-  --color-surface: #ffffff;
-  --color-line: #e4e4e7;
-  --color-ink: #18181b;
-  --color-muted: #6b7280;
-  --color-brand: #ef4444;
-  --color-study: #2563eb;
-  --color-fun: #f59e0b;
-  --color-other: #8b5cf6;
-  --color-skip: #9ca3af;
+  --color-canvas: #08080b;
+  --color-surface: #101017;
+  --color-raised: #17171f;
+  --color-line: #23232e;
+  --color-ink: #f2f2f5;
+  --color-muted: #8b8b9a;
+
+  --color-brand: #6d5efc;
+  --color-accent: #22d3ee;
+
+  --color-study: #4f8cff;
+  --color-fun: #f7a53b;
+  --color-other: #a78bfa;
+  --color-skip: #5b5b6b;
+  --color-danger: #f8717a;
+
+  --radius-card: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --color-canvas: #0b0b0d;
-    --color-surface: #17171b;
-    --color-line: #2a2a30;
-    --color-ink: #fafafa;
-    --color-muted: #9ca3af;
+    --color-canvas: #f7f7f9;
+    --color-surface: #ffffff;
+    --color-raised: #ffffff;
+    --color-line: #e6e6ec;
+    --color-ink: #16161d;
+    --color-muted: #63636f;
+    --color-skip: #b6b6c2;
   }
 }
 
-html,
-body {
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
+html {
+  color-scheme: dark light;
 }
 
 body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * A single soft light source behind the whole app. Fixed and pointer-events
+ * free so it never enters layout or intercepts a click on the player.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, color-mix(in oklab, var(--color-brand) 16%, transparent), transparent 70%),
+    radial-gradient(50rem 35rem at 90% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent 70%);
 }
 
 @layer components {
   .card {
     background-color: var(--color-surface);
     border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+  }
+
+  /* Cards that are also a control: lift a little on hover. */
+  .card-hover {
+    transition:
+      transform 160ms ease,
+      border-color 160ms ease,
+      background-color 160ms ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
+    background-color: var(--color-raised);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     border-radius: 0.75rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition:
+      transform 120ms ease,
+      opacity 120ms ease,
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    color: #fff;
+    background-image: linear-gradient(135deg, var(--color-brand), var(--color-accent));
+    box-shadow: 0 6px 20px -8px color-mix(in oklab, var(--color-brand) 80%, transparent);
+  }
+  .btn-primary:hover {
+    opacity: 0.92;
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--color-line);
+    color: var(--color-muted);
+    background-color: transparent;
+  }
+  .btn-ghost:hover {
+    color: var(--color-ink);
+    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
+  }
+
+  .input {
+    width: 100%;
+    border-radius: 0.875rem;
+    border: 1px solid var(--color-line);
+    background-color: var(--color-surface);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .input:focus {
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand) 22%, transparent);
+  }
+
+  /* Filter pills, category chips. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-line);
+    padding: 0.3125rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    transition:
+      color 140ms ease,
+      border-color 140ms ease,
+      background-color 140ms ease;
+  }
+  .chip:hover {
+    color: var(--color-ink);
+  }
+  .chip[aria-pressed='true'] {
+    color: var(--color-ink);
+    border-color: color-mix(in oklab, var(--color-brand) 55%, var(--color-line));
+    background-color: color-mix(in oklab, var(--color-brand) 14%, transparent);
+  }
+
+  .skeleton {
+    border-radius: 0.625rem;
+    background: linear-gradient(
+      90deg,
+      var(--color-surface) 25%,
+      var(--color-raised) 37%,
+      var(--color-surface) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* Numbers that should read as a headline. */
+  .stat {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .gradient-text {
+    background-image: linear-gradient(135deg, var(--color-brand), var(--color-accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Section content settles in on route change. Short enough not to feel laggy. */
+.animate-rise {
+  animation: rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Progress bars fill from empty on mount. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+.animate-grow {
+  transform-origin: left;
+  animation: grow-x 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Column charts grow upward, so they need the other axis. */
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+.animate-grow-y {
+  transform-origin: bottom;
+  animation: grow-y 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * Anyone who has asked their system to reduce motion gets none of it. The
+ * layouts do not depend on animation, so switching it off changes nothing but
+ * the movement.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-hover:hover {
+    transform: none;
   }
 }

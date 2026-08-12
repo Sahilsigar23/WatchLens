@@ -90,6 +90,26 @@ every duration is known up front instead.
 
 ---
 
+## Interface
+
+Dark-first, built on CSS custom properties in [`globals.css`](src/app/globals.css). The dark palette
+is the default in Tailwind's `@theme`; the light block restates only the surface and text variables,
+so no component carries a `dark:` variant. Identity is an indigo → cyan "lens" gradient —
+deliberately not YouTube red, because YouTube is the source and WatchLens is the product around it.
+
+- **Icons are inlined SVG** ([`Icon.tsx`](src/components/Icon.tsx)) rather than an icon package —
+  a dozen paths cost a few hundred bytes and nothing extra sits in front of the player.
+- **Charts are plain divs.** Seven bars and twenty-four bars do not justify a charting library.
+  Removing Recharts took `/weekly` from 216 kB to 117 kB of first-load JS.
+- **Motion is CSS-only** and every animation is switched off under
+  `prefers-reduced-motion: reduce`. Nothing in the layout depends on it.
+- **Navigation:** a top bar with an animated active underline on desktop; a bottom tab bar on
+  mobile, so six sections never have to scroll sideways. The mini-player is offset above it.
+- **Skeletons, not spinners** — stat tiles reserve their final size, so the grid never jumps when
+  numbers arrive.
+
+---
+
 ## Sections
 
 The top navigation splits the app into routes, so each one is a focused page:

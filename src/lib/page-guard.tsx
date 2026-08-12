@@ -25,12 +25,12 @@ export async function guardSection(): Promise<ReactElement | null> {
   }
 }
 
-/** Consistent heading for a section page. */
+/** Consistent page heading, matching the Today and Weekly sections. */
 export function SectionHeading({ title, description }: { title: string; description: string }) {
   return (
-    <div>
-      <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1 text-sm text-muted">{description}</p>
-    </div>
+    <header className="mb-6">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+      <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
+    </header>
   );
 }

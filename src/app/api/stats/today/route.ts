@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { loadSessions, summarizeByDay } from '@/lib/analytics';
+import { hourlyWatchedSeconds, loadSessions, summarizeByDay } from '@/lib/analytics';
 import { requireUserId, UnauthorizedError } from '@/lib/auth';
 import { timeZoneFromRequest, todayInZone, utcRangeFor } from '@/lib/dates';
 
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     const { since, until } = utcRangeFor(dates);
     const sessions = await loadSessions(userId, since, until);
 
-    return NextResponse.json({ stats: summarizeByDay(sessions, dates, timeZone)[0] });
+    return NextResponse.json({
+      stats: summarizeByDay(sessions, dates, timeZone)[0],
+      hourly: hourlyWatchedSeconds(sessions, dates[0], timeZone),
+    });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Not signed in' }, { status: 401 });

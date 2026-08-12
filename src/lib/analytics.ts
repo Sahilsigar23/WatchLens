@@ -366,6 +366,105 @@ export async function loadHistory(userId: number, limit = 100): Promise<HistoryR
     .slice(0, limit);
 }
 
+/**
+ * Consecutive days ending today (or yesterday) on which this user watched
+ * something.
+ *
+ * Counted straight from session dates in SQL rather than by replaying events:
+ * a streak only asks *whether* a day had activity, and replaying two months of
+ * event logs to answer that would make the Weekly page pay for a decoration.
+ *
+ * Yesterday counts as the anchor too, so a streak is not reported broken during
+ * a day the user simply has not watched anything yet.
+ */
+export async function currentStreak(userId: number, timeZone: string): Promise<number> {
+  const rows = await query<{ day: string }>(
+    `SELECT DISTINCT to_char((s.started_at AT TIME ZONE $2)::date, 'YYYY-MM-DD') AS day
+       FROM watch_sessions s
+      WHERE s.user_id = $1
+        AND s.started_at > now() - interval '120 days'
+      ORDER BY day DESC
+      LIMIT 120`,
+    [userId, timeZone],
+  );
+  if (rows.length === 0) return 0;
+
+  const active = new Set(rows.map((r) => r.day));
+  const today = todayKey(timeZone);
+  const yesterday = shiftDay(today, -1);
+
+  let cursor = active.has(today) ? today : active.has(yesterday) ? yesterday : null;
+  if (cursor === null) return 0;
+
+  let streak = 0;
+  while (active.has(cursor)) {
+    streak += 1;
+    cursor = shiftDay(cursor, -1);
+  }
+  return streak;
+}
+
+function todayKey(timeZone: string): string {
+  return dateKeyInZone(new Date(), timeZone);
+}
+
+/** Day arithmetic on a UTC-anchored date, so DST cannot shift the result. */
+function shiftDay(key: string, delta: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Watched seconds bucketed into the 24 hours of a local day.
+ *
+ * The watch-time algorithm works on the *video* timeline, which says nothing
+ * about when in the day something was watched. Each session's watched total is
+ * therefore spread across the wall-clock hours it actually spanned, in
+ * proportion to how much of the session fell in each. That keeps every bar
+ * honest against the day's total — the buckets always sum to the same number
+ * `summarizeByDay` reports — without pretending to a precision the event log
+ * does not carry.
+ */
+export function hourlyWatchedSeconds(
+  sessions: SessionRecord[],
+  date: string,
+  timeZone: string,
+): number[] {
+  const hours = new Array<number>(24).fill(0);
+
+  for (const session of sessions) {
+    if (dateKeyInZone(session.startedAt, timeZone) !== date) continue;
+
+    const stats = computeWatchStats(session.intervals, session.durationSeconds);
+    if (stats.watchedSeconds <= 0) continue;
+
+    const startMs = session.startedAt.getTime();
+    const endMs = startMs + Math.max(1000, session.elapsedSeconds * 1000);
+    const spanMs = endMs - startMs;
+
+    // Walk the wall-clock span hour by hour, crediting each with its share.
+    for (let cursor = startMs; cursor < endMs; ) {
+      const hour = Number(
+        new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hour12: false }).format(
+          new Date(cursor),
+        ),
+      );
+      const nextHour = new Date(cursor);
+      nextHour.setMinutes(60, 0, 0);
+      const sliceEnd = Math.min(endMs, nextHour.getTime());
+
+      const share = (sliceEnd - cursor) / spanMs;
+      if (hour >= 0 && hour < 24) hours[hour] += stats.watchedSeconds * share;
+
+      cursor = sliceEnd;
+    }
+  }
+
+  return hours.map((value) => Math.round(value));
+}
+
 /** Everything known about one video's viewing, before a duration is applied. */
 export interface VideoCoverage {
   intervals: Interval[];

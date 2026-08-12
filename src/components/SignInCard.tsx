@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { Icon } from '@/components/Icon';
 import { clearPlayerState } from '@/lib/player-state';
 
 /** Kept in step with MIN_PASSWORD_LENGTH in lib/password.ts. */
@@ -60,12 +61,25 @@ export function SignInCard() {
   };
 
   return (
-    <div className="mx-auto max-w-md space-y-4 pt-10">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">WatchLens</h1>
-        <p className="text-sm text-muted">
-          See how much of each YouTube video you actually watched — not how much of it played.
-        </p>
+    <div className="mx-auto max-w-md space-y-6 pt-10 sm:pt-16">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <span
+          className="grid h-14 w-14 place-items-center rounded-2xl text-white"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, var(--color-brand), var(--color-accent))',
+            boxShadow: '0 18px 40px -18px color-mix(in oklab, var(--color-brand) 90%, transparent)',
+          }}
+        >
+          <Icon name="lens" size={28} strokeWidth={1.8} />
+        </span>
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Watch<span className="gradient-text">Lens</span>
+          </h1>
+          <p className="text-sm text-muted">
+            See how much of each YouTube video you actually watched — not how much of it played.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={submit} className="card space-y-3 p-5">
@@ -82,7 +96,7 @@ export function SignInCard() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded-xl border border-line bg-canvas px-4 py-2.5 text-sm outline-none focus:border-brand"
+            className="input"
           />
         </div>
 
@@ -102,12 +116,12 @@ export function SignInCard() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder={mode === 'signup' ? `At least ${MIN_PASSWORD_LENGTH} characters` : '••••••••'}
-            className="w-full rounded-xl border border-line bg-canvas px-4 py-2.5 text-sm outline-none focus:border-brand"
+            className="input"
           />
         </div>
 
         {error && (
-          <p role="alert" className="text-sm text-brand">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
@@ -115,7 +129,7 @@ export function SignInCard() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary w-full"
         >
           {busy
             ? mode === 'signup'

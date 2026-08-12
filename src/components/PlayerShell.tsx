@@ -4,12 +4,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { PlayerRequest } from '@/components/AppShell';
-import { LiveSession } from '@/components/LiveSession';
+import { Icon } from '@/components/Icon';
+import { NowPlaying } from '@/components/NowPlaying';
 import { PlaylistSidebar } from '@/components/PlaylistSidebar';
 import { VideoInput } from '@/components/VideoInput';
+import { WatchEmptyState } from '@/components/WatchEmptyState';
 import { YouTubePlayer, type VideoChange } from '@/components/YouTubePlayer';
 import { useWatchTracker } from '@/hooks/useWatchTracker';
-import { formatTimecode } from '@/lib/format';
 import { readPlayerState, writePlayerState, type StoredPlayerState } from '@/lib/player-state';
 import type { PlaylistSummary, ResumePoint } from '@/lib/types';
 import type { PlayerSource, YouTubePlayer as Player } from '@/lib/youtube';
@@ -357,10 +358,14 @@ export function PlayerShell({
       className={
         expanded
           ? 'mb-6 space-y-4'
-          : 'fixed bottom-3 right-3 z-40 w-64 space-y-2 rounded-xl border border-line bg-surface p-2 shadow-2xl sm:w-80'
+          : 'fixed bottom-20 right-3 z-30 w-60 space-y-2 rounded-2xl border border-line bg-surface/95 p-2 shadow-2xl backdrop-blur-xl sm:w-72 md:bottom-4'
       }
     >
-      {expanded && <VideoInput onSelectVideo={selectVideo} onSelectPlaylist={selectPlaylist} />}
+      {/* Compact search sits above the player; the empty state carries its own,
+          larger one so it reads as the hero of the page. */}
+      {expanded && playerMounted && source && (
+        <VideoInput onSelectVideo={selectVideo} onSelectPlaylist={selectPlaylist} />
+      )}
 
       {playerMounted && source ? (
         <div className={expanded ? 'grid gap-4 lg:grid-cols-3' : ''}>
@@ -382,31 +387,16 @@ export function PlayerShell({
               onVideoChange={onVideoChange}
             />
 
-            {/* Video information — title, channel, and where to pick back up. */}
-            {expanded && (title || tracker.resumePosition !== null) && (
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="truncate text-lg font-semibold tracking-tight" title={title}>
-                    {title || 'Loading…'}
-                  </h1>
-                  {channelName && (
-                    <p className="truncate text-sm text-muted">{channelName}</p>
-                  )}
-                </div>
-
-                {tracker.resumePosition !== null && (
-                  <button
-                    type="button"
-                    onClick={tracker.resume}
-                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
-                  >
-                    Continue from {formatTimecode(tracker.resumePosition)}
-                  </button>
-                )}
-              </div>
+            {expanded && (
+              <NowPlaying
+                title={title}
+                channelName={channelName}
+                stats={tracker.liveStats}
+                saving={tracker.saving}
+                onResume={tracker.resume}
+                resumePosition={tracker.resumePosition}
+              />
             )}
-
-            {expanded && <LiveSession stats={tracker.liveStats} saving={tracker.saving} />}
           </div>
 
           {expanded && playlist && (
@@ -423,13 +413,7 @@ export function PlayerShell({
         </div>
       ) : (
         expanded && (
-          <div className="card flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-            <p className="text-lg font-medium">Paste a YouTube link to start</p>
-            <p className="max-w-md text-sm text-muted">
-              A video or a whole playlist. WatchLens measures how much of each one you actually
-              played — fast-forwarded parts do not count.
-            </p>
-          </div>
+          <WatchEmptyState onSelectVideo={selectVideo} onSelectPlaylist={selectPlaylist} />
         )
       )}
 

@@ -1,5 +1,6 @@
 import { TodayPanel } from '@/components/TodayPanel';
-import { guardSection, SectionHeading } from '@/lib/page-guard';
+import { getCurrentUser } from '@/lib/auth';
+import { guardSection } from '@/lib/page-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,13 +8,10 @@ export default async function TodayPage() {
   const fallback = await guardSection();
   if (fallback) return fallback;
 
-  return (
-    <div className="space-y-4">
-      <SectionHeading
-        title="Today"
-        description="Actual watch time, study and entertainment time, and what you skipped — for today in your timezone."
-      />
-      <TodayPanel />
-    </div>
-  );
+  // The part of the address before the @ is the friendliest name available
+  // without asking for one.
+  const user = await getCurrentUser();
+  const name = user?.email.split('@')[0] ?? '';
+
+  return <TodayPanel name={name} />;
 }
