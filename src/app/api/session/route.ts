@@ -25,6 +25,8 @@ export async function POST(request: Request) {
       title?: string;
       channelName?: string;
       durationSeconds?: number;
+      youtubePlaylistId?: string | null;
+      playlistIndex?: number | null;
     };
 
     const youtubeVideoId = String(body.youtubeVideoId ?? '').trim();
@@ -72,9 +74,26 @@ export async function POST(request: Request) {
     // (still empty) session cannot influence it.
     const lastPosition = await lastPositionFor(userId, youtubeVideoId);
 
+    // Playlist context is optional. A standalone video sends neither field and
+    // the session is stored exactly as it was before playlists existed.
+    const rawPlaylistId = String(body.youtubePlaylistId ?? '').trim();
+    let playlistDbId: number | null = null;
+    if (/^[\w-]{12,64}$/.test(rawPlaylistId)) {
+      const row = await queryOne<{ id: string }>(
+        'SELECT id FROM playlists WHERE youtube_playlist_id = $1',
+        [rawPlaylistId],
+      );
+      playlistDbId = row ? Number(row.id) : null;
+    }
+
+    const rawIndex = Number(body.playlistIndex);
+    const playlistIndex =
+      playlistDbId !== null && Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : null;
+
     const session = await queryOne<{ id: string }>(
-      'INSERT INTO watch_sessions (user_id, video_id) VALUES ($1, $2) RETURNING id',
-      [userId, Number(video.id)],
+      `INSERT INTO watch_sessions (user_id, video_id, playlist_id, playlist_index)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [userId, Number(video.id), playlistDbId, playlistIndex],
     );
     if (!session) throw new Error('Could not create the session');
 

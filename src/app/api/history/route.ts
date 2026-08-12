@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { loadHistory } from '@/lib/analytics';
 import { requireUserId, UnauthorizedError } from '@/lib/auth';
+import { parsePositiveInt } from '@/lib/dates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,8 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const userId = await requireUserId();
-    const raw = Number(new URL(request.url).searchParams.get('limit'));
-    const limit = Number.isFinite(raw) ? Math.min(500, Math.max(1, raw)) : 100;
+    const limit = parsePositiveInt(new URL(request.url).searchParams.get('limit'), 100, 500);
 
     return NextResponse.json({ videos: await loadHistory(userId, limit) });
   } catch (error) {

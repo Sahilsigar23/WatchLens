@@ -45,6 +45,26 @@ export function utcRangeFor(dates: string[]): { since: Date; until: Date } {
   return { since: first, until: last };
 }
 
+/**
+ * Reads a positive integer query parameter, falling back when it is absent or
+ * unusable.
+ *
+ * The subtlety this exists for: `searchParams.get()` returns `null` when a
+ * parameter is missing, and `Number(null)` is `0` — which is finite, so a naive
+ * `Number.isFinite` check accepts it and a `Math.max(1, …)` clamp silently turns
+ * "no limit given" into "limit 1".
+ */
+export function parsePositiveInt(
+  raw: string | null,
+  fallback: number,
+  max: number,
+): number {
+  if (raw === null || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 1) return fallback;
+  return Math.min(max, Math.floor(value));
+}
+
 /** Reads `?tz=` and falls back rather than trusting arbitrary input. */
 export function timeZoneFromRequest(request: Request): string {
   const value = new URL(request.url).searchParams.get('tz');

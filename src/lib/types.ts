@@ -84,6 +84,48 @@ export interface HistoryRow {
   sessionCount: number;
 }
 
+/** Where a video stands, for the playlist sidebar's ✓ / ▶ / ○ markers. */
+export type ItemStatus = 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
+
+export interface PlaylistItem {
+  position: number;
+  youtubeVideoId: string;
+  title: string;
+  channelName: string;
+  /** 0 when the duration is not known yet — see the note in playlist-meta.ts. */
+  durationSeconds: number;
+  watchedSeconds: number;
+  skippedSeconds: number;
+  watchedPercentage: number;
+  reachedEnd: boolean;
+  status: ItemStatus;
+}
+
+export interface PlaylistAnalytics {
+  videoCount: number;
+  completed: number;
+  inProgress: number;
+  notStarted: number;
+  /** Sum of per-video unique coverage. */
+  watchedSeconds: number;
+  /** Sum of durations, for videos whose duration is known. */
+  totalDurationSeconds: number;
+  skippedSeconds: number;
+  /** watchedSeconds / totalDurationSeconds, 0..1. */
+  progress: number;
+  /** True when at least one duration is still unknown, so totals are partial. */
+  durationsIncomplete: boolean;
+}
+
+export interface PlaylistSummary {
+  youtubePlaylistId: string;
+  title: string;
+  items: PlaylistItem[];
+  analytics: PlaylistAnalytics;
+  /** Index the user was last watching in this playlist, if they have history. */
+  resumeIndex: number | null;
+}
+
 export interface DayStats {
   /** YYYY-MM-DD in the user's timezone. */
   date: string;

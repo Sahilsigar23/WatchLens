@@ -66,3 +66,43 @@ CREATE INDEX IF NOT EXISTS watch_events_session_idx
 CREATE UNIQUE INDEX IF NOT EXISTS watch_events_client_event_id_key
   ON watch_events (client_event_id)
   WHERE client_event_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Playlists
+--
+-- A playlist is just an ordered list of videos, so it needs no watch data of
+-- its own: every figure on the playlist panel is derived from the same
+-- watch_events log as everything else. That keeps one source of truth and means
+-- playlist progress and history can never disagree.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS playlists (
+  id                   BIGSERIAL PRIMARY KEY,
+  youtube_playlist_id  TEXT NOT NULL UNIQUE,
+  title                TEXT NOT NULL DEFAULT '',
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- `position` is the video's index within the playlist, matching the index the
+-- IFrame player reports. Re-ordering a playlist on YouTube rewrites these rows.
+CREATE TABLE IF NOT EXISTS playlist_items (
+  playlist_id  BIGINT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+  position     INTEGER NOT NULL,
+  video_id     BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  PRIMARY KEY (playlist_id, position)
+);
+
+CREATE INDEX IF NOT EXISTS playlist_items_video_idx ON playlist_items (video_id);
+
+-- Which playlist (if any) a session was watched from. Nullable: a standalone
+-- video has no playlist, and the whole tracking path works exactly as before
+-- when these are NULL.
+ALTER TABLE watch_sessions ADD COLUMN IF NOT EXISTS playlist_id BIGINT
+  REFERENCES playlists(id) ON DELETE SET NULL;
+ALTER TABLE watch_sessions ADD COLUMN IF NOT EXISTS playlist_index INTEGER;
+
+-- Powers "continue where you stopped": the most recent session carrying this
+-- playlist gives back the index the user was last on.
+CREATE INDEX IF NOT EXISTS watch_sessions_user_playlist_idx
+  ON watch_sessions (user_id, playlist_id, started_at DESC)
+  WHERE playlist_id IS NOT NULL;

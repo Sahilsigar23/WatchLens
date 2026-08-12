@@ -15,8 +15,8 @@ import { buildIntervals, computeWatchStats, type RawEvent } from './watch-time';
  * would not change.
  */
 
-/** A study video counts as "completed" once this much of it has been watched. */
-const COMPLETION_THRESHOLD = 0.9;
+/** A video counts as "completed" once this much of it has been watched. */
+export const COMPLETION_THRESHOLD = 0.9;
 
 export interface SessionRecord {
   sessionId: number;
@@ -58,13 +58,8 @@ interface EventRow {
  * Loads every session in `[since, until)` together with its replayed intervals.
  * Two queries total, regardless of how many sessions come back.
  */
-export async function loadSessions(
-  userId: number,
-  since: Date,
-  until: Date,
-): Promise<SessionRecord[]> {
-  const sessionRows = await query<SessionRow>(
-    `SELECT s.id            AS session_id,
+/** The session columns every loader selects, so they share one row shape. */
+const SESSION_COLUMNS = `s.id            AS session_id,
             v.id            AS video_id,
             v.youtube_video_id,
             v.title,
@@ -72,16 +67,54 @@ export async function loadSessions(
             v.duration_seconds,
             v.category,
             s.started_at,
-            s.ended_at
-       FROM watch_sessions s
-       JOIN videos v ON v.id = s.video_id
-      WHERE s.user_id = $1
-        AND s.started_at >= $2
-        AND s.started_at < $3
-      ORDER BY s.started_at ASC`,
-    [userId, since, until],
-  );
+            s.ended_at`;
 
+export async function loadSessions(
+  userId: number,
+  since: Date,
+  until: Date,
+): Promise<SessionRecord[]> {
+  return attachEvents(
+    await query<SessionRow>(
+      `SELECT ${SESSION_COLUMNS}
+         FROM watch_sessions s
+         JOIN videos v ON v.id = s.video_id
+        WHERE s.user_id = $1
+          AND s.started_at >= $2
+          AND s.started_at < $3
+        ORDER BY s.started_at ASC`,
+      [userId, since, until],
+    ),
+  );
+}
+
+/**
+ * Sessions for a specific set of videos, all time.
+ *
+ * The playlist panel needs exactly this: replaying a user's entire history to
+ * show progress on twenty videos would get slower every week they use the app.
+ */
+export async function loadSessionsForVideos(
+  userId: number,
+  youtubeVideoIds: string[],
+): Promise<SessionRecord[]> {
+  if (youtubeVideoIds.length === 0) return [];
+
+  return attachEvents(
+    await query<SessionRow>(
+      `SELECT ${SESSION_COLUMNS}
+         FROM watch_sessions s
+         JOIN videos v ON v.id = s.video_id
+        WHERE s.user_id = $1
+          AND v.youtube_video_id = ANY($2::text[])
+        ORDER BY s.started_at ASC`,
+      [userId, youtubeVideoIds],
+    ),
+  );
+}
+
+/** Loads each session's events and replays them into watched spans. */
+async function attachEvents(sessionRows: SessionRow[]): Promise<SessionRecord[]> {
   if (sessionRows.length === 0) return [];
 
   const sessionIds = sessionRows.map((r) => Number(r.session_id));
@@ -221,7 +254,9 @@ export function summarizeByDay(
       if (video.category === 'STUDY') {
         studySeconds += stats.watchedSeconds;
         studyVideoCount += 1;
-        if (stats.reachedEnd || stats.watchedPercentage >= COMPLETION_THRESHOLD) {
+        // Watched-through, not merely played-through: reaching the end by
+        // fast-forwarding is exactly what this app refuses to call completion.
+        if (stats.watchedPercentage >= COMPLETION_THRESHOLD) {
           completedStudyVideoCount += 1;
         }
       } else if (video.category === 'ENTERTAINMENT') {
@@ -316,6 +351,46 @@ export async function loadHistory(userId: number, limit = 100): Promise<HistoryR
     })
     .sort((a, b) => b.lastWatchedAt.localeCompare(a.lastWatchedAt))
     .slice(0, limit);
+}
+
+/** Everything known about one video's viewing, before a duration is applied. */
+export interface VideoCoverage {
+  intervals: Interval[];
+  reachedEnd: boolean;
+  /** Duration recorded when the video was last played; 0 if never played. */
+  durationSeconds: number;
+}
+
+/**
+ * Merged coverage per video, keyed by YouTube id.
+ *
+ * Returned without a duration applied so the caller can pass the best one it
+ * has — the playlist panel often knows a duration from the Data API for a video
+ * the user has never opened, which the database cannot know yet.
+ */
+export async function coverageForVideos(
+  userId: number,
+  youtubeVideoIds: string[],
+): Promise<Map<string, VideoCoverage>> {
+  const sessions = await loadSessionsForVideos(userId, youtubeVideoIds);
+  const coverage = new Map<string, VideoCoverage>();
+
+  for (const session of sessions) {
+    const existing = coverage.get(session.youtubeVideoId);
+    if (existing) {
+      existing.intervals.push(...session.intervals);
+      existing.reachedEnd = existing.reachedEnd || session.reachedEnd;
+      if (session.durationSeconds > 0) existing.durationSeconds = session.durationSeconds;
+    } else {
+      coverage.set(session.youtubeVideoId, {
+        intervals: [...session.intervals],
+        reachedEnd: session.reachedEnd,
+        durationSeconds: session.durationSeconds,
+      });
+    }
+  }
+
+  return coverage;
 }
 
 /**

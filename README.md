@@ -64,7 +64,45 @@ That last definition matters. Abandoning a 60-minute video after 10 honest minut
 
 Rewatching · seeking backward · seeking forward · pause/resume · closing the tab · switching tabs ·
 video ending · refreshing the page · network interruptions · multiple sessions for the same video ·
-playback-rate changes · lost events.
+playback-rate changes · lost events · playlist auto-advance · a session that failed to open.
+
+---
+
+## Playlists
+
+Paste a playlist link and the whole course opens with a sidebar beside the player. A link carrying
+both `v=` and `list=` opens as a playlist, matching what YouTube itself does.
+
+- Click any video, or use Previous / Next.
+- The playlist auto-advances at the end of each video and the sidebar follows.
+- Each video is tracked as its own set of sessions, so `✓ / ◐ / ○` and the per-video percentage are
+  the same numbers the history page reports.
+- Reopening a playlist continues from the video you stopped on — and moves to the next one if you
+  had already finished it.
+
+The panel underneath aggregates the whole playlist: videos, completed, in progress, not started,
+actual study time, total duration, skipped time, and real progress.
+
+**Playlists work without a YouTube API key.** The IFrame player itself reports the playlist's
+contents and order, and titles come from oEmbed. The one thing neither provides is *duration*, so
+durations fill in as you open each video and the panel says so meanwhile. Set `YOUTUBE_API_KEY` and
+every duration is known up front instead.
+
+---
+
+## The persistent player
+
+Navigating from Watch to History and back does not disturb the video. It keeps playing, at the same
+position, with the same playlist, volume, speed and watch session.
+
+This works because the player is mounted in the **root layout**
+([`src/components/AppShell.tsx`](src/components/AppShell.tsx)), not in any page. Next.js does not
+unmount a layout when the routed segment changes, so the iframe is never destroyed. Off the Watch
+route the *same DOM node* is restyled into a corner mini-player; nothing is re-parented, because
+moving an iframe in the DOM reloads it and would restart playback.
+
+A hard reload is the one case a player genuinely cannot survive. For that, the video, playlist,
+index and position are mirrored to `localStorage` and the video reopens where you left it.
 
 ---
 
@@ -153,10 +191,17 @@ Supabase SQL editor.
 ```
 users            id · email · created_at
 videos           id · youtube_video_id · title · channel_name · duration_seconds · category · created_at
+playlists        id · youtube_playlist_id · title · created_at
+playlist_items   playlist_id → playlists · position · video_id → videos
 watch_sessions   id · user_id → users · video_id → videos · started_at · ended_at
+                 · playlist_id → playlists (nullable) · playlist_index (nullable)
 watch_events     id · session_id → watch_sessions · event_type · video_time · previous_video_time
                  · timestamp · client_event_id
 ```
+
+A playlist holds no watch data of its own — every figure on the playlist panel is derived from the
+same `watch_events` log as everything else, so playlist progress and history can never disagree.
+`playlist_id` / `playlist_index` on a session are nullable, and a standalone video stores neither.
 
 `watch_events` is append-only and is the single source of truth — all analytics are derived from it
 at read time, so improving the algorithm improves past history with no migration.
@@ -176,6 +221,7 @@ Two details worth knowing:
 |---|---|
 | `POST /api/auth` · `GET` · `DELETE` | sign in / whoami / sign out |
 | `POST /api/session` | open a watch session, returns `sessionId` and a resume position |
+| `POST /api/playlist` | playlist contents, per-video progress, aggregate panel, resume index |
 | `POST /api/events` | batched event ingest (~1 request / 10s) |
 | `GET /api/stats/today?tz=` | today's learning report |
 | `GET /api/stats/weekly?tz=` | Monday–Sunday rollup |
@@ -198,7 +244,12 @@ The tracking system is built so it cannot interfere with the video:
 - Analytics fetching is entirely separate from playback. If the API is down, the player keeps
   playing and the per-video numbers keep updating — they are computed in the browser with the same
   algorithm the server uses.
-- Switching videos calls `loadVideoById`, so there is no remount and no page reload.
+- Switching videos calls `loadVideoById` / `playVideoAt`, so there is no remount and no page reload.
+- The player is created **once per visit**. Navigation, playlist changes and video changes all go
+  through API calls on the existing player.
+- `children` reaches the shell as a prop from the server layout, so a stats refresh or a player
+  state change re-renders the shell without re-rendering the page below it. The playlist sidebar and
+  analytics panel are `memo`ised so the 5-second heartbeat does not redraw twenty rows.
 - The player uses YouTube's native controls: play/pause, seek, volume, playback speed, captions,
   quality and fullscreen all behave normally.
 
@@ -247,33 +298,42 @@ db/
   migrate.mjs             applies schema.sql to DATABASE_URL
 src/
   app/
-    page.tsx              watch page
+    layout.tsx            mounts AppShell — the reason the player survives navigation
+    page.tsx              watch page (analytics only; the player lives in the layout)
     history/page.tsx      per-video history
     privacy/page.tsx      disclosure + delete controls
-    api/                  auth · session · events · stats · history · search · account
+    api/                  auth · session · events · playlist · stats · history · search · account
   components/
-    YouTubePlayer.tsx     IFrame Player API wrapper
-    WatchDashboard.tsx    watch page composition
+    AppShell.tsx          ★ persistent layout + stats-refresh signal
+    PlayerShell.tsx       ★ player state, playlist state, expanded / mini-player
+    YouTubePlayer.tsx     IFrame Player API wrapper — created once, never remounted
+    PlaylistSidebar.tsx   the video list, ✓ / ◐ / ○ and per-video progress
+    PlaylistAnalytics.tsx aggregate playlist panel
+    DashboardStats.tsx    today + weekly, refreshed independently of playback
     LiveSession.tsx       live per-video readout
     StatCards.tsx         today's numbers + learning report
     WeeklyChart.tsx       Recharts weekly bars
     HistoryTable.tsx      responsive table / cards
-    VideoInput.tsx        URL parsing + optional search
+    VideoInput.tsx        video / playlist URL parsing + optional search
     Nav · CategoryBadge · TrackingNotice · DataControls · SignInCard · SetupNotice
   hooks/
     useWatchTracker.ts    player → events: seek detection, heartbeat, visibility
   lib/
     watch-time.ts         ★ the algorithm
     intervals.ts          merge / union / clamp
-    analytics.ts          event log → daily, weekly, history
-    tracker.ts            batching, retry, sendBeacon
+    analytics.ts          event log → daily, weekly, history, per-video coverage
+    playlist-progress.ts  coverage → sidebar rows + playlist panel (pure)
+    playlist-meta.ts      playlist contents: Data API, or player ids + oEmbed
+    tracker.ts            batching, retry, sendBeacon, session windows
     classify.ts           STUDY / ENTERTAINMENT / OTHER (pluggable)
-    youtube.ts            URL parsing + IFrame API loader
+    youtube.ts            video + playlist URL parsing, IFrame API loader
     youtube-meta.ts       oEmbed fallback for title/channel
     db · auth · dates · format · types
 tests/
   watch-time.test.ts      19 tests, including the exact example from the brief
+  playlist.test.ts        15 tests
   classify.test.ts        6 tests
+  tracker.test.ts         5 tests
 ```
 
 ---

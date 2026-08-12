@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { VideoChange } from '@/components/YouTubePlayer';
 import { EventTracker } from '@/lib/tracker';
 import type { EventType } from '@/lib/types';
 import { PlayerState, type YouTubePlayer as Player } from '@/lib/youtube';
@@ -87,9 +88,22 @@ async function waitForMetadata(
   };
 }
 
-export function useWatchTracker(videoId: string | null) {
+/**
+ * @param playlistId  YouTube playlist the current video belongs to, or null.
+ *                    Stored in a ref rather than a dependency so a playlist
+ *                    change never rebuilds the poll interval or the listeners.
+ * @param onSessionChange  Fired when a new session opens, so the dashboard can
+ *                    refresh without the tracker knowing anything about it.
+ */
+export function useWatchTracker(playlistId: string | null, onSessionChange?: () => void) {
   const playerRef = useRef<Player | null>(null);
   const trackerRef = useRef<EventTracker | null>(null);
+
+  const playlistIdRef = useRef(playlistId);
+  playlistIdRef.current = playlistId;
+
+  const onSessionChangeRef = useRef(onSessionChange);
+  onSessionChangeRef.current = onSessionChange;
 
   /** Local mirror of the event stream, used to render stats without the API. */
   const localEventsRef = useRef<RawEvent[]>([]);
@@ -139,7 +153,7 @@ export function useWatchTracker(videoId: string | null) {
   }, []);
 
   /** Opens a `watch_sessions` row for the video currently in the player. */
-  const startSession = useCallback(async (id: string) => {
+  const startSession = useCallback(async (id: string, playlistIndex: number) => {
     const player = playerRef.current;
     if (!player || creatingRef.current === id) return;
     creatingRef.current = id;
@@ -148,6 +162,11 @@ export function useWatchTracker(videoId: string | null) {
     sessionVideoRef.current = id;
     setResumePosition(null);
     setLiveStats(EMPTY_STATS);
+
+    // Opens the buffering window for this video and discards anything left
+    // over from a video whose session failed to open, so its watch time can
+    // never be credited to this one.
+    trackerRef.current?.beginSession();
 
     // Right after loadVideoById the player knows the id but not yet the title
     // or duration, and a duration of 0 would make every percentage in the
@@ -164,6 +183,8 @@ export function useWatchTracker(videoId: string | null) {
       title: metadata.title,
       channelName: metadata.channelName,
       durationSeconds: metadata.durationSeconds,
+      youtubePlaylistId: playlistIdRef.current,
+      playlistIndex: playlistIndex >= 0 ? playlistIndex : null,
     };
 
     try {
@@ -182,6 +203,7 @@ export function useWatchTracker(videoId: string | null) {
       // Offered as a button rather than an automatic jump — silently moving
       // someone's playhead is worse than letting them choose.
       setResumePosition(json.lastPosition ?? null);
+      onSessionChangeRef.current?.();
     } catch {
       // No session id means nothing can be persisted, but the local stats and
       // the video itself keep working. This is the "analytics API is down"
@@ -195,21 +217,25 @@ export function useWatchTracker(videoId: string | null) {
   const handlePlayerReady = useCallback(
     (player: Player) => {
       playerRef.current = player;
-      const id = player.getVideoData?.()?.video_id ?? videoId;
-      if (id) void startSession(id);
+      const id = player.getVideoData?.()?.video_id;
+      // A cued playlist has no current video yet; the first onStateChange will
+      // report one and open the session through handleVideoChange.
+      if (id) void startSession(id, player.getPlaylistIndex?.() ?? -1);
     },
-    [startSession, videoId],
+    [startSession],
   );
 
   const handleVideoChange = useCallback(
-    (newVideoId: string) => {
+    ({ videoId, playlistIndex }: VideoChange) => {
       const player = playerRef.current;
       if (!player) return;
-      if (sessionVideoRef.current === newVideoId) return;
+      if (sessionVideoRef.current === videoId) return;
 
+      // Close out the outgoing video before the new session opens, so its
+      // watched span ends at the position it was actually left on.
       record('VIDEO_CHANGE', player.getCurrentTime?.() ?? 0);
       void trackerRef.current?.flush();
-      void startSession(newVideoId);
+      void startSession(videoId, playlistIndex);
     },
     [record, startSession],
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { AppShell } from '@/components/AppShell';
 import { Nav } from '@/components/Nav';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -26,7 +27,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen">
         <Nav email={email} />
-        <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6">{children}</main>
+        {/*
+          AppShell owns the YouTube player. Keeping it in the layout rather than
+          in a page is the whole reason the video survives navigating to History
+          and back — layouts are not unmounted when the routed segment changes.
+        */}
+        <AppShell signedIn={email !== null}>{children}</AppShell>
       </body>
     </html>
   );

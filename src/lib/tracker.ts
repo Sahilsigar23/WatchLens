@@ -32,12 +32,31 @@ export class EventTracker {
   private inFlight = false;
   private sessionId: number | null = null;
 
-  /** Set once the session row exists. Events tracked before then are held. */
+  /**
+   * Starts a new session's buffering window.
+   *
+   * Anything still unassigned belongs to a video whose session never opened —
+   * the API was down, or the request failed. Those events must be dropped here,
+   * because `setSessionId` adopts every unassigned event, and without this they
+   * would be re-stamped onto the *next* video's session: one video's watch time
+   * silently credited to another.
+   */
+  beginSession(): void {
+    this.buffer = this.buffer.filter((e) => e.sessionId !== 0);
+    this.sessionId = null;
+  }
+
+  /** Set once the session row exists. Events tracked since `beginSession` are adopted. */
   setSessionId(sessionId: number): void {
     this.sessionId = sessionId;
     for (const event of this.buffer) {
       if (event.sessionId === 0) event.sessionId = sessionId;
     }
+  }
+
+  /** Number of events waiting for a session id. Exposed for tests. */
+  pendingCount(): number {
+    return this.buffer.filter((e) => e.sessionId === 0).length;
   }
 
   start(): void {

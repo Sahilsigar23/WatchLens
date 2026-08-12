@@ -44,6 +44,38 @@ export function parseVideoId(input: string): string | null {
   return null;
 }
 
+/**
+ * Pulls a playlist id out of a URL.
+ *
+ * Returns null for the `RD…`/`RDMM…` auto-generated mixes: YouTube refuses to
+ * embed those and they have no fixed item list, so treating them as playlists
+ * would produce an empty sidebar and a dead player.
+ */
+export function parsePlaylistId(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const isUsable = (id: string) => /^[\w-]{12,64}$/.test(id) && !/^RD/.test(id);
+
+  if (isUsable(trimmed) && /^(PL|UU|LL|FL|OL)/.test(trimmed)) return trimmed;
+
+  try {
+    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+    const host = url.hostname.replace(/^www\./, '');
+    if (!/^(m\.|music\.)?youtube\.com$|^youtu\.be$/.test(host)) return null;
+
+    const list = url.searchParams.get('list');
+    return list && isUsable(list) ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What the player should be showing. */
+export type PlayerSource =
+  | { kind: 'video'; videoId: string }
+  | { kind: 'playlist'; playlistId: string; index: number };
+
 /** YouTube's numeric player states, named. */
 export const PlayerState = {
   UNSTARTED: -1,
@@ -65,8 +97,27 @@ export interface YouTubePlayer {
   getDuration(): number;
   getPlayerState(): number;
   getPlaybackRate(): number;
+  setPlaybackRate(rate: number): void;
   getVideoData(): { video_id: string; title: string; author: string };
   destroy(): void;
+
+  // Playlist controls. `cuePlaylist` loads without autoplaying, which is what
+  // we want when restoring a playlist the user has not asked to resume yet.
+  cuePlaylist(options: { list: string; listType: string; index?: number; startSeconds?: number }): void;
+  loadPlaylist(options: { list: string; listType: string; index?: number; startSeconds?: number }): void;
+  /** Video ids in playlist order. Empty until the playlist has loaded. */
+  getPlaylist(): string[] | null;
+  getPlaylistIndex(): number;
+  playVideoAt(index: number): void;
+  nextVideo(): void;
+  previousVideo(): void;
+
+  // Volume and mute, so they can be carried across a forced player rebuild.
+  getVolume(): number;
+  setVolume(volume: number): void;
+  isMuted(): boolean;
+  mute(): void;
+  unMute(): void;
 }
 
 interface YouTubeApi {

@@ -2,51 +2,94 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { loadYouTubeApi, type YouTubePlayer as Player } from '@/lib/youtube';
+import { loadYouTubeApi, type PlayerSource, type YouTubePlayer as Player } from '@/lib/youtube';
+
+/** Reported alongside a video change so callers can keep their index in step. */
+export interface VideoChange {
+  videoId: string;
+  /** Index within the playlist, or -1 when not playing a playlist. */
+  playlistIndex: number;
+}
 
 interface YouTubePlayerProps {
-  videoId: string;
-  /** Seconds to resume from, applied only when the video first loads. */
-  startSeconds?: number;
+  source: PlayerSource;
+  /**
+   * Position to open the very first video at, used to recover from a hard
+   * reload. Read once at construction; later changes are ignored, because
+   * moving the playhead out from under someone mid-video is not a restore.
+   */
+  initialStartSeconds?: number;
   onReady: (player: Player) => void;
   onStateChange: (state: number) => void;
-  /** Fired when the user switches to a different video in the same player. */
-  onVideoChange: (videoId: string) => void;
+  onVideoChange: (change: VideoChange) => void;
+}
+
+/** Volume and speed survive a hard reload; the player object cannot. */
+const PREFS_KEY = 'studytrace.player.prefs';
+
+interface PlayerPrefs {
+  volume?: number;
+  muted?: boolean;
+  rate?: number;
+}
+
+function readPrefs(): PlayerPrefs {
+  try {
+    return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as PlayerPrefs;
+  } catch {
+    return {};
+  }
+}
+
+function writePrefs(prefs: PlayerPrefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Private mode or a full quota. Preferences are a nicety, never a blocker.
+  }
 }
 
 /**
- * Thin wrapper around the official YouTube IFrame Player API.
+ * Wrapper around the official YouTube IFrame Player API.
  *
- * The player is created once and kept for the life of the page. Changing
- * `videoId` calls `loadVideoById` rather than remounting the iframe, so
- * switching videos never reloads the page or throws away YouTube's warm
- * connection to its CDN.
+ * The player is created **once** and lives for the whole session. Changing
+ * video or playlist goes through `loadVideoById` / `cuePlaylist` /
+ * `playVideoAt`, never a remount — recreating the iframe would restart
+ * playback, drop volume and speed, and cost a fresh connection to YouTube's
+ * CDN. Mounting this component inside the root layout (see PlayerShell) is what
+ * keeps that true across client-side navigation.
  *
- * The video stream goes straight from YouTube to the browser. StudyTrace's
- * server sees only the events this component reports.
+ * Video bytes go straight from YouTube to the browser; the server sees only the
+ * events reported from here.
  */
 export function YouTubePlayer({
-  videoId,
-  startSeconds,
+  source,
+  initialStartSeconds,
   onReady,
   onStateChange,
   onVideoChange,
 }: YouTubePlayerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Player | null>(null);
-  /** What we last asked the player to load — stops duplicate loadVideoById calls. */
-  const requestedVideoIdRef = useRef<string | null>(null);
-  /** What the player reports it is actually showing — drives onVideoChange. */
-  const loadedVideoIdRef = useRef<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
-  // Callbacks live in refs so the player is never rebuilt just because a parent
-  // re-render produced new function identities.
+  /**
+   * `requested*` is what we last asked the player for; `loadedVideoId` is what
+   * the player says it is showing. Keeping them apart is what stops a feedback
+   * loop: when the playlist auto-advances, we sync `requested` to the player's
+   * own index so the source effect sees nothing to do and does not "correct"
+   * the player back to the start of the video it just moved on to.
+   */
+  const requestedVideoIdRef = useRef<string | null>(null);
+  const requestedPlaylistIdRef = useRef<string | null>(null);
+  const requestedIndexRef = useRef<number>(-1);
+  const loadedVideoIdRef = useRef<string | null>(null);
+
   const callbacks = useRef({ onReady, onStateChange, onVideoChange });
   callbacks.current = { onReady, onStateChange, onVideoChange };
 
-  const initialVideoId = useRef(videoId);
-  const initialStart = useRef(startSeconds);
+  const initialSource = useRef(source);
+  const initialStart = useRef(initialStartSeconds);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,46 +98,99 @@ export function YouTubePlayer({
       .then((YT) => {
         if (cancelled || !hostRef.current) return;
 
-        playerRef.current = new YT.Player(hostRef.current, {
-          videoId: initialVideoId.current,
-          playerVars: {
-            // Native controls give the user play/pause, seek, volume, speed,
-            // captions and fullscreen — the normal YouTube experience.
-            controls: 1,
-            rel: 0,
-            modestbranding: 1,
-            playsinline: 1,
-            origin: window.location.origin,
-            start: initialStart.current ? Math.floor(initialStart.current) : undefined,
-          },
-          events: {
+        const start = initialSource.current;
+        const playerVars: Record<string, unknown> = {
+          // Native controls: play/pause, seek, volume, speed, captions,
+          // quality and fullscreen all behave the way YouTube's own do.
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          origin: window.location.origin,
+        };
+
+        // `start` reopens the video where a previous visit left it. Autoplay is
+        // deliberately not set, so a restored player waits for the user.
+        if (initialStart.current && initialStart.current > 0) {
+          playerVars.start = Math.floor(initialStart.current);
+        }
+
+        // The `videoId` key must be absent (not undefined) for a playlist embed:
+        // the IFrame API branches on its presence, and passing it as undefined
+        // produces an iframe with no src at all.
+        const options: Record<string, unknown> = { playerVars };
+
+        if (start.kind === 'playlist') {
+          playerVars.list = start.playlistId;
+          playerVars.listType = 'playlist';
+          requestedPlaylistIdRef.current = start.playlistId;
+          requestedIndexRef.current = start.index;
+        } else {
+          options.videoId = start.videoId;
+          requestedVideoIdRef.current = start.videoId;
+          loadedVideoIdRef.current = start.videoId;
+        }
+
+        options.events = {
             onReady: (event: { target: Player }) => {
               if (cancelled) return;
-              loadedVideoIdRef.current = initialVideoId.current;
-              requestedVideoIdRef.current = initialVideoId.current;
               setStatus('ready');
+
+              // `index` is not a valid embed parameter — only cuePlaylist takes
+              // one — so a non-zero starting index is applied here instead.
+              if (start.kind === 'playlist' && start.index > 0) {
+                try {
+                  event.target.cuePlaylist({
+                    list: start.playlistId,
+                    listType: 'playlist',
+                    index: start.index,
+                    // Re-cueing discards the `start` player var, so the restored
+                    // position has to be handed over here as well.
+                    startSeconds: initialStart.current ?? 0,
+                  });
+                } catch {
+                  // Fall back to whatever the embed already cued.
+                }
+              }
+
+              // Restore volume/speed from the last visit. Within a visit the
+              // player is never rebuilt, so this only matters after a reload.
+              const prefs = readPrefs();
+              try {
+                if (typeof prefs.volume === 'number') event.target.setVolume(prefs.volume);
+                if (prefs.muted) event.target.mute();
+                if (typeof prefs.rate === 'number') event.target.setPlaybackRate(prefs.rate);
+              } catch {
+                // An older embed may not expose all of these.
+              }
+
               callbacks.current.onReady(event.target);
             },
             onStateChange: (event: { data: number; target: Player }) => {
               if (cancelled) return;
 
-              // The player reports the id it is actually showing. Any change —
-              // the user picking a new video above, or an end-screen click
-              // inside the player — surfaces here, so tracking switches
-              // sessions from one place rather than two.
+              // One place detects every video change: the user picking from the
+              // sidebar, prev/next, the playlist auto-advancing at the end, or
+              // an end-screen click inside the player itself.
               const actual = event.target.getVideoData?.()?.video_id;
               if (actual && actual !== loadedVideoIdRef.current) {
+                const index = event.target.getPlaylistIndex?.() ?? -1;
                 loadedVideoIdRef.current = actual;
                 requestedVideoIdRef.current = actual;
-                callbacks.current.onVideoChange(actual);
+                requestedIndexRef.current = index;
+                callbacks.current.onVideoChange({ videoId: actual, playlistIndex: index });
               }
               callbacks.current.onStateChange(event.data);
+            },
+            onPlaybackRateChange: (event: { data: number }) => {
+              writePrefs({ ...readPrefs(), rate: event.data });
             },
             onError: () => {
               if (!cancelled) setStatus('error');
             },
-          },
-        });
+        };
+
+        playerRef.current = new YT.Player(hostRef.current, options);
       })
       .catch(() => {
         if (!cancelled) setStatus('error');
@@ -107,21 +203,50 @@ export function YouTubePlayer({
     };
   }, []);
 
-  // Switch videos in place — no remount, no page reload.
+  // Apply source changes in place.
   useEffect(() => {
     const player = playerRef.current;
     if (!player || status !== 'ready') return;
-    if (requestedVideoIdRef.current === videoId) return;
 
-    // Only `requested` is updated here. `loaded` stays behind until the player
-    // confirms the switch, which is what lets onStateChange raise onVideoChange
-    // with metadata that actually belongs to the new video.
-    requestedVideoIdRef.current = videoId;
-    player.loadVideoById({
-      videoId,
-      startSeconds: startSeconds ? Math.floor(startSeconds) : undefined,
-    });
-  }, [videoId, startSeconds, status]);
+    if (source.kind === 'playlist') {
+      if (requestedPlaylistIdRef.current !== source.playlistId) {
+        requestedPlaylistIdRef.current = source.playlistId;
+        requestedIndexRef.current = source.index;
+        // Cue rather than load: opening a playlist should not start playing on
+        // its own, especially when we are restoring one from a previous visit.
+        player.cuePlaylist({
+          list: source.playlistId,
+          listType: 'playlist',
+          index: source.index,
+        });
+      } else if (requestedIndexRef.current !== source.index) {
+        requestedIndexRef.current = source.index;
+        player.playVideoAt(source.index);
+      }
+      return;
+    }
+
+    requestedPlaylistIdRef.current = null;
+    if (requestedVideoIdRef.current !== source.videoId) {
+      requestedVideoIdRef.current = source.videoId;
+      player.loadVideoById({ videoId: source.videoId });
+    }
+  }, [source, status]);
+
+  // Persist volume/mute periodically — the API has no volume-change event.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const player = playerRef.current;
+      if (!player || typeof player.getVolume !== 'function') return;
+      try {
+        writePrefs({ ...readPrefs(), volume: player.getVolume(), muted: player.isMuted() });
+      } catch {
+        // Ignore: preferences are best-effort.
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-black shadow-lg">

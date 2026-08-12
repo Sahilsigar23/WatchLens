@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { parseVideoId } from '@/lib/youtube';
+import { parsePlaylistId, parseVideoId } from '@/lib/youtube';
 
 interface SearchResult {
   videoId: string;
@@ -10,12 +10,19 @@ interface SearchResult {
   channelName: string;
 }
 
+export interface VideoInputProps {
+  onSelectVideo: (videoId: string) => void;
+  onSelectPlaylist: (playlistId: string) => void;
+}
+
 /**
- * One box for both jobs. A YouTube link or bare id loads immediately; anything
- * else is treated as a search query, which needs YOUTUBE_API_KEY. When no key
- * is configured the box still works for links — it just says so.
+ * One box for three jobs: a video link, a playlist link, or a search query.
+ *
+ * A URL carrying both `v=` and `list=` opens as a playlist, which is what
+ * YouTube itself does and what the user almost always means. Search needs
+ * YOUTUBE_API_KEY; links always work without one.
  */
-export function VideoInput({ onSelect }: { onSelect: (videoId: string) => void }) {
+export function VideoInput({ onSelectVideo, onSelectPlaylist }: VideoInputProps) {
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,12 +33,23 @@ export function VideoInput({ onSelect }: { onSelect: (videoId: string) => void }
     const input = value.trim();
     if (!input) return;
 
-    const videoId = parseVideoId(input);
-    if (videoId) {
+    const clear = () => {
       setResults([]);
       setMessage(null);
       setValue('');
-      onSelect(videoId);
+    };
+
+    const playlistId = parsePlaylistId(input);
+    if (playlistId) {
+      clear();
+      onSelectPlaylist(playlistId);
+      return;
+    }
+
+    const videoId = parseVideoId(input);
+    if (videoId) {
+      clear();
+      onSelectVideo(videoId);
       return;
     }
 
@@ -56,7 +74,7 @@ export function VideoInput({ onSelect }: { onSelect: (videoId: string) => void }
     setResults([]);
     setMessage(null);
     setValue('');
-    onSelect(videoId);
+    onSelectVideo(videoId);
   };
 
   return (
@@ -66,8 +84,8 @@ export function VideoInput({ onSelect }: { onSelect: (videoId: string) => void }
           type="text"
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          placeholder="Paste a YouTube link, or search…"
-          aria-label="YouTube link or search query"
+          placeholder="Paste a YouTube video or playlist link, or search…"
+          aria-label="YouTube video link, playlist link, or search query"
           className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm outline-none placeholder:text-muted focus:border-brand"
         />
         <button

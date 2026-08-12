@@ -41,7 +41,10 @@ export function WeeklyChart({ days }: { days: DayStats[] }) {
 
       <div className="card p-4">
         {hasData ? (
-          <div className="h-64 w-full">
+          // `overflow-hidden`: Recharts sizes its legend wrapper in inline
+          // pixels and does not shrink it when the viewport does, so a device
+          // rotation can otherwise leave a legend wider than the page.
+          <div className="h-64 w-full overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" vertical={false} />
