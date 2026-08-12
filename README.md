@@ -90,6 +90,27 @@ every duration is known up front instead.
 
 ---
 
+## Sections
+
+The top navigation splits the app into routes, so each one is a focused page:
+
+| Section | Route | Contents |
+|---|---|---|
+| **Watch** | `/` | Search box, player, playlist sidebar, video title/channel, continue-watching |
+| **History** | `/history` | Every video watched, all-time, with watched vs skipped |
+| **Today** | `/today` | Today's actual watch, study, entertainment and skipped time |
+| **Weekly** | `/weekly` | Monday–Sunday chart plus the week's totals |
+| **Playlists** | `/playlists` | Playlists opened, their progress, and Continue |
+| **Settings** | `/settings` | Account, what is tracked, and data deletion |
+
+**Watch is deliberately not a dashboard.** No daily figures, weekly chart or history table sit under
+the player — only what belongs to the video on screen. A practical side effect: the charting library
+now loads on `/weekly` rather than on the landing page.
+
+`/watch` redirects to `/`.
+
+---
+
 ## The persistent player
 
 Navigating from Watch to History and back does not disturb the video. It keeps playing, at the same
@@ -367,18 +388,25 @@ db/
 src/
   app/
     layout.tsx            mounts AppShell — the reason the player survives navigation
-    page.tsx              watch page (analytics only; the player lives in the layout)
+    page.tsx              Watch — nearly empty; the player lives in the layout
+    watch/page.tsx        redirect to /
     history/page.tsx      per-video history
-    privacy/page.tsx      disclosure + delete controls
+    today/page.tsx        today's figures
+    weekly/page.tsx       Monday–Sunday chart + totals
+    playlists/page.tsx    playlists opened, with progress and Continue
+    settings/page.tsx     account, tracking disclosure, delete controls
+    privacy/page.tsx      full privacy policy
     api/                  auth · session · events · playlist · stats · history · search · account
     api/user/             history · playlists · statistics · progress (account-scoped reads)
   components/
-    AppShell.tsx          ★ persistent layout + stats-refresh signal
+    AppShell.tsx          ★ persistent layout, stats-refresh signal, player commands
     PlayerShell.tsx       ★ player state, playlist state, expanded / mini-player
     YouTubePlayer.tsx     IFrame Player API wrapper — created once, never remounted
     PlaylistSidebar.tsx   the video list, ✓ / ◐ / ○ and per-video progress
-    PlaylistAnalytics.tsx aggregate playlist panel
-    DashboardStats.tsx    today + weekly, refreshed independently of playback
+    PlaylistAnalytics.tsx aggregate playlist panel (used by /playlists)
+    TodayPanel.tsx        /today, refreshed independently of playback
+    WeeklyPanel.tsx       /weekly chart + totals
+    PlaylistsPanel.tsx    /playlists, with Continue driving the persistent player
     LiveSession.tsx       live per-video readout
     StatCards.tsx         today's numbers + learning report
     WeeklyChart.tsx       Recharts weekly bars

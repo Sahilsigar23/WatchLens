@@ -79,8 +79,22 @@ export async function POST(request: Request) {
     const rawPlaylistId = String(body.youtubePlaylistId ?? '').trim();
     let playlistDbId: number | null = null;
     if (/^[\w-]{12,64}$/.test(rawPlaylistId)) {
+      /**
+       * Insert rather than look up. The browser calls this and /api/playlist
+       * concurrently — the player reports its current video long before it has
+       * enumerated the playlist — so a plain SELECT lost that race and stored
+       * `playlist_id = NULL`, silently detaching the first session of every
+       * playlist from it. Creating the row here is idempotent, and
+       * /api/playlist fills in the title and items when it arrives.
+       *
+       * The no-op DO UPDATE is what makes RETURNING yield the existing row on
+       * conflict; DO NOTHING would return nothing and reintroduce the bug.
+       */
       const row = await queryOne<{ id: string }>(
-        'SELECT id FROM playlists WHERE youtube_playlist_id = $1',
+        `INSERT INTO playlists (youtube_playlist_id) VALUES ($1)
+         ON CONFLICT (youtube_playlist_id)
+           DO UPDATE SET youtube_playlist_id = EXCLUDED.youtube_playlist_id
+         RETURNING id`,
         [rawPlaylistId],
       );
       playlistDbId = row ? Number(row.id) : null;

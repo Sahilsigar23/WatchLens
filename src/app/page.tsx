@@ -1,22 +1,18 @@
-import { DashboardStats } from '@/components/DashboardStats';
-import { SetupNotice } from '@/components/SetupNotice';
-import { SignInCard } from '@/components/SignInCard';
-import { getCurrentUserId } from '@/lib/auth';
+import { guardSection } from '@/lib/page-guard';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * The Watch page is only the analytics below the player — the player, the
- * search box and the playlist all live in the layout's AppShell so they survive
- * navigation. See src/components/PlayerShell.tsx.
+ * Watch — the landing page.
+ *
+ * Deliberately almost empty: the search box, player, playlist sidebar and video
+ * information are all rendered by PlayerShell inside the layout, which is what
+ * keeps them alive across navigation. Putting them in this page instead would
+ * unmount the iframe every time the user visited another section.
+ *
+ * Analytics live in their own sections (/today, /weekly, /history, /playlists)
+ * so this page stays a watching surface rather than a dashboard.
  */
-export default async function HomePage() {
-  let userId: number | null;
-  try {
-    userId = await getCurrentUserId();
-  } catch (error) {
-    return <SetupNotice detail={error instanceof Error ? error.message : undefined} />;
-  }
-
-  return userId === null ? <SignInCard /> : <DashboardStats />;
+export default async function WatchPage() {
+  return (await guardSection()) ?? null;
 }

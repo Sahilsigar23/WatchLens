@@ -5,10 +5,17 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import { clearPlayerState } from '@/lib/player-state';
 
+/**
+ * Every section is a route, so moving between them is client-side navigation
+ * and the player in the layout is never unmounted. See AppShell.
+ */
 const LINKS = [
   { href: '/', label: 'Watch' },
   { href: '/history', label: 'History' },
-  { href: '/privacy', label: 'Privacy' },
+  { href: '/today', label: 'Today' },
+  { href: '/weekly', label: 'Weekly' },
+  { href: '/playlists', label: 'Playlists' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 export function Nav({ email }: { email: string | null }) {
@@ -31,36 +38,39 @@ export function Nav({ email }: { email: string | null }) {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
-      {/* Wraps on narrow screens: logo and Sign out stay on the first row and
-          the links drop to a second one, rather than overflowing the viewport. */}
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-sm font-bold text-white">
             W
           </span>
-          <span className="text-base font-semibold tracking-tight">WatchLens</span>
+          <span className="hidden text-base font-semibold tracking-tight sm:block">WatchLens</span>
         </Link>
 
-        <nav className="order-3 flex w-full items-center gap-1 text-sm sm:order-none sm:w-auto">
-          {LINKS.map((link) => {
-            const active = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-lg px-3 py-1.5 transition-colors ${
-                  active ? 'bg-canvas font-medium text-ink' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {email && (
+          // Six sections will not fit a phone, so the row scrolls sideways
+          // rather than wrapping into a second line that pushes the player down.
+          <nav className="-mx-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {LINKS.map((link) => {
+              const active = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${
+                    active ? 'bg-canvas font-medium text-ink' : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {email && (
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <span className="hidden max-w-[16ch] truncate text-sm text-muted sm:block">
+            <span className="hidden max-w-[16ch] truncate text-sm text-muted lg:block">
               {email}
             </span>
             <button

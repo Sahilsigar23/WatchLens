@@ -3,8 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { PlayerRequest } from '@/components/AppShell';
 import { LiveSession } from '@/components/LiveSession';
-import { PlaylistAnalytics } from '@/components/PlaylistAnalytics';
 import { PlaylistSidebar } from '@/components/PlaylistSidebar';
 import { VideoInput } from '@/components/VideoInput';
 import { YouTubePlayer, type VideoChange } from '@/components/YouTubePlayer';
@@ -45,9 +45,16 @@ interface ShellState {
 
 const EMPTY_STATE: ShellState = { videoId: null, playlistId: null, playlistIndex: 0 };
 
-export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void }) {
+export function PlayerShell({
+  onSessionChange,
+  request,
+}: {
+  onSessionChange?: () => void;
+  request?: PlayerRequest | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
+  /** Full size on the Watch page; a corner mini-player in every other section. */
   const expanded = pathname === '/';
 
   const [state, setState] = useState<ShellState>(EMPTY_STATE);
@@ -288,6 +295,23 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
   }, [state.videoId, state.playlistIndex, refreshPlaylist]);
 
   /**
+   * Load whatever another section asked for — the Playlists page opening a
+   * course, for instance. Keyed on the request's nonce rather than its id so
+   * re-opening the same playlist still registers.
+   */
+  const lastRequestRef = useRef<number>(0);
+  useEffect(() => {
+    if (!request || request.nonce === lastRequestRef.current) return;
+    lastRequestRef.current = request.nonce;
+
+    if (request.kind === 'playlist') {
+      if (stateRef.current.playlistId !== request.id) selectPlaylist(request.id);
+    } else if (stateRef.current.videoId !== request.id) {
+      selectVideo(request.id);
+    }
+  }, [request, selectPlaylist, selectVideo]);
+
+  /**
    * Jump to where the user stopped in this playlist. Only ever applied before
    * they have played anything, so it can never yank the playhead mid-video.
    */
@@ -321,6 +345,11 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
 
   const currentItem = playlist?.items[state.playlistIndex] ?? null;
 
+  // The player reports metadata for whatever is on screen; the playlist row is
+  // the fallback while it is still resolving, so the title does not flicker.
+  const title = tracker.videoMeta?.title || currentItem?.title || '';
+  const channelName = tracker.videoMeta?.channelName || currentItem?.channelName || '';
+
   if (!hydrated) return null;
 
   return (
@@ -353,14 +382,28 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
               onVideoChange={onVideoChange}
             />
 
-            {expanded && tracker.resumePosition !== null && (
-              <button
-                type="button"
-                onClick={tracker.resume}
-                className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
-              >
-                Resume from {formatTimecode(tracker.resumePosition)}
-              </button>
+            {/* Video information — title, channel, and where to pick back up. */}
+            {expanded && (title || tracker.resumePosition !== null) && (
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="truncate text-lg font-semibold tracking-tight" title={title}>
+                    {title || 'Loading…'}
+                  </h1>
+                  {channelName && (
+                    <p className="truncate text-sm text-muted">{channelName}</p>
+                  )}
+                </div>
+
+                {tracker.resumePosition !== null && (
+                  <button
+                    type="button"
+                    onClick={tracker.resume}
+                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition-colors hover:border-brand"
+                  >
+                    Continue from {formatTimecode(tracker.resumePosition)}
+                  </button>
+                )}
+              </div>
             )}
 
             {expanded && <LiveSession stats={tracker.liveStats} saving={tracker.saving} />}
@@ -394,7 +437,11 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
         <p className="card p-4 text-sm text-muted">{playlistError}</p>
       )}
 
-      {expanded && playlist && <PlaylistAnalytics analytics={playlist.analytics} />}
+      {/*
+        The playlist's aggregate figures live on /playlists now — the Watch page
+        keeps only what belongs to the video on screen. The sidebar still shows
+        per-video progress, which is part of choosing what to watch next.
+      */}
 
       {/* Mini-player caption doubles as the way back to the Watch page. */}
       {!expanded && playerMounted && (
@@ -404,7 +451,7 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
           className="flex w-full items-center justify-between gap-2 px-1 text-left"
         >
           <span className="min-w-0 flex-1 truncate text-xs text-muted">
-            {currentItem?.title || 'Back to Watch'}
+            {title || 'Back to Watch'}
           </span>
           <span className="shrink-0 text-xs text-brand">Open ↗</span>
         </button>

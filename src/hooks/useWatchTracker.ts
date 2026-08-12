@@ -122,6 +122,8 @@ export function useWatchTracker(playlistId: string | null, onSessionChange?: () 
   const [liveStats, setLiveStats] = useState<LiveStats>(EMPTY_STATS);
   const [saving, setSaving] = useState<'idle' | 'ok' | 'offline'>('idle');
   const [resumePosition, setResumePosition] = useState<number | null>(null);
+  /** Title and channel of the video on screen, for the Watch page header. */
+  const [videoMeta, setVideoMeta] = useState<{ title: string; channelName: string } | null>(null);
 
   if (trackerRef.current === null) trackerRef.current = new EventTracker();
 
@@ -162,6 +164,7 @@ export function useWatchTracker(playlistId: string | null, onSessionChange?: () 
     sessionVideoRef.current = id;
     setResumePosition(null);
     setLiveStats(EMPTY_STATS);
+    setVideoMeta(null);
 
     // Opens the buffering window for this video and discards anything left
     // over from a video whose session failed to open, so its watch time can
@@ -177,6 +180,8 @@ export function useWatchTracker(playlistId: string | null, onSessionChange?: () 
       creatingRef.current = null;
       return; // the user moved on while we were waiting
     }
+
+    setVideoMeta({ title: metadata.title, channelName: metadata.channelName });
 
     const payload = {
       youtubeVideoId: id,
@@ -365,5 +370,7 @@ export function useWatchTracker(playlistId: string | null, onSessionChange?: () 
     /** Seconds this user previously reached in this video, if worth offering. */
     resumePosition,
     resume,
+    /** Title and channel of the current video, once the player reports them. */
+    videoMeta,
   };
 }

@@ -34,8 +34,8 @@ export function WeeklyChart({ days }: { days: DayStats[] }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-muted">Weekly activity</h2>
+      {/* The Weekly section supplies the heading; this is only the unit note. */}
+      <div className="flex items-baseline justify-end">
         <span className="text-xs text-muted">minutes actually watched</span>
       </div>
 

@@ -39,9 +39,9 @@ export function TodayStats({ stats }: { stats: DayStats | null }) {
   const partiallyWatched = Math.max(0, s.studyVideoCount - s.completedStudyVideoCount);
 
   return (
+    // No heading of its own: the Today section provides one, and a second
+    // would just repeat it.
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-muted">Today</h2>
-
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
           label="Actual watched"
