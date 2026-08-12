@@ -79,22 +79,32 @@ export function VideoInput({ onSelectVideo, onSelectPlaylist, size = 'default' }
 
   return (
     <div className={size === 'hero' ? 'mx-auto w-full max-w-xl space-y-3' : 'space-y-3'}>
-      <form onSubmit={submit} className="relative flex items-center gap-2">
-        <span className="pointer-events-none absolute left-4 text-muted">
-          <Icon name="search" size={17} />
-        </span>
-        <input
-          type="text"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="Paste a YouTube video or playlist link…"
-          aria-label="YouTube video link, playlist link, or search query"
-          className={`input pl-11 ${size === 'hero' ? 'py-3.5' : ''}`}
-        />
+      {/*
+        The button sits inside the field from 420px up, and becomes a full-width
+        control beneath it on a phone — at 320px an inline button leaves the
+        input too narrow to read a pasted URL, and a stacked one is a far easier
+        thumb target. 420px rather than the sm breakpoint because a phone in
+        landscape is wide enough for the inline form, and stacking there pushed
+        the player below the fold.
+      */}
+      <form onSubmit={submit} className="space-y-2 min-[420px]:relative min-[420px]:space-y-0">
+        <div className="relative flex items-center">
+          <span className="pointer-events-none absolute left-4 text-muted">
+            <Icon name="search" size={17} />
+          </span>
+          <input
+            type="text"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="Paste a YouTube link…"
+            aria-label="YouTube video link, playlist link, or search query"
+            className={`input pl-11 min-[420px]:pr-[6.5rem] ${size === 'hero' ? 'py-3.5' : ''}`}
+          />
+        </div>
         <button
           type="submit"
           disabled={searching || value.trim() === ''}
-          className="btn btn-primary absolute right-1.5 py-2"
+          className="btn btn-primary w-full min-[420px]:absolute min-[420px]:right-1.5 min-[420px]:top-1/2 min-[420px]:w-auto min-[420px]:-translate-y-1/2"
         >
           {searching ? 'Searching…' : 'Watch'}
         </button>

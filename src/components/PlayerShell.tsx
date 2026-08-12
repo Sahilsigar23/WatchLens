@@ -432,7 +432,7 @@ export function PlayerShell({
         <button
           type="button"
           onClick={() => router.push('/')}
-          className="flex w-full items-center justify-between gap-2 px-1 text-left"
+          className="flex min-h-10 w-full items-center justify-between gap-2 px-2 py-1.5 text-left"
         >
           <span className="min-w-0 flex-1 truncate text-xs text-muted">
             {title || 'Back to Watch'}

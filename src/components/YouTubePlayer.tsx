@@ -254,7 +254,21 @@ export function YouTubePlayer({
   }, []);
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl bg-black shadow-lg">
+    /*
+     * The width cap is what makes landscape usable. The 16:9 box below derives
+     * height from width, so on a short viewport — a phone turned sideways —
+     * the video would otherwise be taller than the screen and have to be
+     * scrolled. Capping *width* to what the remaining height can accommodate
+     * shrinks it to fit while keeping the ratio exact. The 11rem covers the
+     * header, page padding and the search field above it. On a tall screen the
+     * computed cap exceeds the column width and has no effect at all.
+     *
+     * `dvh` rather than `vh` so mobile browser chrome is accounted for.
+     */
+    <div
+      className="relative mx-auto w-full overflow-hidden rounded-xl bg-black shadow-lg"
+      style={{ maxWidth: 'calc((100dvh - 11rem) * 16 / 9)' }}
+    >
       {/* 16:9 box so the player is responsive without layout shift. */}
       <div className="relative w-full pt-[56.25%]">
         <div ref={hostRef} className="absolute inset-0 h-full w-full" />

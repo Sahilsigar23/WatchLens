@@ -42,7 +42,7 @@ export function Nav({ email }: { email: string | null }) {
     <>
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/" className="flex h-11 shrink-0 items-center gap-2.5">
             <Logo />
             <span className="text-[0.95rem] font-semibold tracking-tight">WatchLens</span>
           </Link>
@@ -88,7 +88,7 @@ export function Nav({ email }: { email: string | null }) {
                 aria-label="Settings"
                 aria-current={isActive('/settings') ? 'page' : undefined}
                 title={email}
-                className={`grid h-9 w-9 place-items-center rounded-full border transition-colors ${
+                className={`grid h-10 w-10 place-items-center rounded-full border transition-colors ${
                   isActive('/settings')
                     ? 'border-brand text-ink'
                     : 'border-line text-muted hover:text-ink'

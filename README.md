@@ -108,6 +108,23 @@ deliberately not YouTube red, because YouTube is the source and WatchLens is the
 - **Skeletons, not spinners** — stat tiles reserve their final size, so the grid never jumps when
   numbers arrive.
 
+### Mobile
+
+Measured, not assumed. Every section is audited at **320 / 375 / 390 / 430 / 768 / 1280**, portrait
+and landscape, for horizontal overflow, sub-40px tap targets, clipped text and player geometry.
+
+- **No horizontal scrolling at any width**, down to 320px.
+- **The player is always exactly 16:9.** Its width is capped by
+  `calc((100dvh - 11rem) * 16 / 9)`, which does nothing on a tall screen but keeps a phone in
+  landscape from rendering a video taller than the viewport. `dvh` accounts for browser chrome.
+- **The playlist is a sidebar only from `lg` up**; below that it stacks full-width under the player.
+- **Bottom tab bar under `md`**, top bar above it. The mini-player is offset to clear the bar.
+- **Controls are ≥40px**: `.btn` and `.chip` carry a `min-height`, and the logo, avatar and
+  mini-player caption were all resized after measurement flagged them at 30/36/16px.
+- **The search button stacks full-width under 420px** and sits inside the field above it — an
+  inline button leaves a 320px field too narrow to read a pasted URL, while stacking it on a
+  landscape phone pushed the player below the fold.
+
 ---
 
 ## Sections
