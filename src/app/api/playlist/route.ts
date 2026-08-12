@@ -13,6 +13,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Vercel's default function limit is 10s, which this route can exceed on the
+ * keyless path: with no YOUTUBE_API_KEY it resolves metadata with one oEmbed
+ * request per video (8 at a time), so a 150-video course is ~19 sequential
+ * round-trips. With a key the same playlist is 8 API calls and finishes well
+ * inside the default — this ceiling only matters for the fallback.
+ */
+export const maxDuration = 60;
+
+/**
  * POST /api/playlist
  *
  * Body: `{ youtubePlaylistId, videoIds?: string[] }`
