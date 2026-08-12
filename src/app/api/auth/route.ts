@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getCurrentUser, signIn, signOut } from '@/lib/auth';
+import { AuthError, getCurrentUser, signIn, signOut, signUp } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,17 +14,33 @@ export async function GET() {
   }
 }
 
-/** POST /api/auth — sign in with an email address. See the caveat in lib/auth.ts. */
+/**
+ * POST /api/auth — `{ email, password, action: 'signin' | 'signup' }`
+ *
+ * `AuthError` messages are written to be shown to the user and are returned as
+ * 400. Anything else is a bug: it is logged server-side and answered with a
+ * generic 500, so an internal failure never leaks its details to the client.
+ */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { email?: string };
-    const userId = await signIn(String(body.email ?? ''));
+    const body = (await request.json()) as {
+      email?: string;
+      password?: string;
+      action?: string;
+    };
+
+    const email = String(body.email ?? '');
+    const password = String(body.password ?? '');
+    const userId =
+      body.action === 'signup' ? await signUp(email, password) : await signIn(email, password);
+
     return NextResponse.json({ userId });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Could not sign in';
-    const isValidation = message.startsWith('Enter a valid');
-    if (!isValidation) console.error('POST /api/auth failed:', error);
-    return NextResponse.json({ error: message }, { status: isValidation ? 400 : 500 });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    console.error('POST /api/auth failed:', error);
+    return NextResponse.json({ error: 'Could not sign in.' }, { status: 500 });
   }
 }
 

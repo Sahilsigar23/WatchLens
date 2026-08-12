@@ -77,9 +77,15 @@ export default async function PrivacyPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Sign-in, honestly</h2>
         <p className="text-sm text-muted">
-          This MVP identifies you by an email address with no password and no verification. Anyone
-          who types your address into this deployment can see your history. Treat it as a personal
-          tool, and add a real authentication provider before sharing it.
+          Accounts are protected by a password, hashed with scrypt and never stored in readable
+          form. Repeated failed sign-ins temporarily lock the account, and the form gives the same
+          answer for an unknown address as for a wrong password, so it cannot be used to find out
+          who has an account here.
+        </p>
+        <p className="text-sm text-muted">
+          Two things it does not do: email addresses are not verified, and there is no password
+          reset — that needs a mail provider this app does not have. If you forget your password,
+          delete the account below and sign up again.
         </p>
       </section>
 

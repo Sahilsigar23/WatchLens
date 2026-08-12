@@ -94,6 +94,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS watch_events_client_event_id_key
 -- playlist progress and history can never disagree.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Password authentication
+--
+-- Nullable on purpose. A NULL hash means the row predates password sign-in.
+-- `signIn` refuses those rather than letting the address alone act as a
+-- credential; `signUp` lets the owner *claim* one by setting a password, which
+-- keeps the account's watch history and ends the exposure. Only a NULL hash is
+-- claimable, so it happens at most once per account.
+--
+-- Once no NULL hashes remain, this can be tightened:
+--   ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+-- ---------------------------------------------------------------------------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+-- Brute-force throttling. Counted per account and reset on any success.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+
 CREATE TABLE IF NOT EXISTS playlists (
   id                   BIGSERIAL PRIMARY KEY,
   youtube_playlist_id  TEXT NOT NULL UNIQUE,

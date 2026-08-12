@@ -313,11 +313,27 @@ The tracking system is built so it cannot interfere with the video:
 is shown on the watch page while a video is open. Users can delete their watch history or their
 entire account from that page; both are immediate, real deletes.
 
-> **Sign-in is not authentication.** This MVP identifies you by an email address with no password
-> and no verification — anyone who types your address into a given deployment sees your history.
-> It exists so the app has a stable user id and a working delete path. Before exposing this to more
-> than one person, replace `signIn` in [`src/lib/auth.ts`](src/lib/auth.ts) with a real provider
-> (Auth.js, Clerk). Nothing else depends on it: the rest of the app only calls `getCurrentUserId()`.
+### Authentication
+
+Accounts are email + password.
+
+- Passwords are hashed with **scrypt** (`N=16384, r=8, p=1`, 64-byte key, 16-byte random salt) using
+  Node's standard library — no native addon to fail at build time. The stored format is
+  `scrypt$N$r$p$salt$hash`, so the cost factors can be raised later without invalidating
+  existing hashes.
+- **No user enumeration.** An unknown address and a wrong password return the same message, and an
+  unknown address still pays the full hashing cost so response time doesn't give it away either.
+- **Brute-force throttling.** Eight failed sign-ins lock the account for 15 minutes; any success
+  resets the counter.
+- Rows created before passwords existed have a `NULL` hash and are refused rather than claimable —
+  that would be the very hole passwords close. Delete and re-create such an account.
+
+Two gaps, both stated in the UI and on `/privacy`:
+
+- **No email verification** and **no password reset** — both need an outbound mail provider this
+  app doesn't have. A forgotten password means deleting the account from `/privacy` and signing up
+  again.
+- Changing a password does not invalidate existing session cookies, which are `HMAC(user_id)`.
 
 ---
 
@@ -420,7 +436,7 @@ No caller changes. A classifier that throws falls back to `OTHER` rather than bl
 
 ## Known limitations
 
-- **Sign-in has no password** (see Privacy above).
+- **No email verification and no password reset** (see Authentication above).
 - **Search needs an API key.** Pasting links always works.
 - **Some videos disallow embedding**; the player shows a clear message when that happens.
 - **Analytics are computed per request** from the raw event log. That is fast for normal use (a
