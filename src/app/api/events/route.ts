@@ -57,16 +57,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unknown session' }, { status: 400 });
     }
 
+    // `user_id` comes from the session cookie, never from the request body, so
+    // a client cannot write events into another account even if it guessed a
+    // session id — that id has already been filtered to this user above.
     await query(
       `INSERT INTO watch_events
-         (session_id, event_type, video_time, previous_video_time, timestamp, client_event_id)
+         (session_id, user_id, event_type, video_time, previous_video_time,
+          timestamp, client_event_id)
        SELECT * FROM UNNEST(
-         $1::bigint[], $2::text[], $3::double precision[],
-         $4::double precision[], $5::timestamptz[], $6::text[]
+         $1::bigint[], $2::bigint[], $3::text[], $4::double precision[],
+         $5::double precision[], $6::timestamptz[], $7::text[]
        )
        ON CONFLICT (client_event_id) WHERE client_event_id IS NOT NULL DO NOTHING`,
       [
         accepted.map((e) => e.sessionId),
+        accepted.map(() => userId),
         accepted.map((e) => e.type as EventType),
         accepted.map((e) => e.videoTime),
         accepted.map((e) =>
@@ -91,8 +96,8 @@ export async function POST(request: Request) {
         query(
           `UPDATE watch_sessions
               SET ended_at = $2
-            WHERE id = $1 AND (ended_at IS NULL OR ended_at < $2)`,
-          [sessionId, new Date(timestamp).toISOString()],
+            WHERE id = $1 AND user_id = $3 AND (ended_at IS NULL OR ended_at < $2)`,
+          [sessionId, new Date(timestamp).toISOString(), userId],
         ),
       ),
     );

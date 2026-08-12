@@ -10,7 +10,8 @@ import { VideoInput } from '@/components/VideoInput';
 import { YouTubePlayer, type VideoChange } from '@/components/YouTubePlayer';
 import { useWatchTracker } from '@/hooks/useWatchTracker';
 import { formatTimecode } from '@/lib/format';
-import type { PlaylistSummary } from '@/lib/types';
+import { readPlayerState, writePlayerState, type StoredPlayerState } from '@/lib/player-state';
+import type { PlaylistSummary, ResumePoint } from '@/lib/types';
 import type { PlayerSource, YouTubePlayer as Player } from '@/lib/youtube';
 
 /**
@@ -29,8 +30,6 @@ import type { PlayerSource, YouTubePlayer as Player } from '@/lib/youtube';
  * localStorage and restored on the next mount.
  */
 
-const STATE_KEY = 'studytrace.player.state';
-
 /** How often the current position is mirrored for hard-reload recovery. */
 const POSITION_SAVE_MS = 5000;
 
@@ -44,23 +43,7 @@ interface ShellState {
   playlistIndex: number;
 }
 
-interface StoredState extends ShellState {
-  position?: number;
-}
-
 const EMPTY_STATE: ShellState = { videoId: null, playlistId: null, playlistIndex: 0 };
-
-function readStored(): StoredState | null {
-  try {
-    const raw = localStorage.getItem(STATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredState;
-    if (!parsed.videoId && !parsed.playlistId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void }) {
   const pathname = usePathname();
@@ -92,7 +75,9 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
   // --- Restore after a hard reload -----------------------------------------
 
   useEffect(() => {
-    const stored = readStored();
+    let cancelled = false;
+
+    const stored = readPlayerState();
     if (stored) {
       setState({
         videoId: stored.videoId,
@@ -102,18 +87,42 @@ export function PlayerShell({ onSessionChange }: { onSessionChange?: () => void 
       // Applied as the player's `start` parameter at construction, so the video
       // opens where it was left instead of at 0:00.
       setRestoredPosition(stored.position && stored.position > 5 ? stored.position : null);
+      setHydrated(true);
+      return;
     }
-    setHydrated(true);
+
+    // Nothing in this browser — a new device, a cleared browser, or a fresh
+    // login. Ask the server where the *account* left off. This is the reason
+    // localStorage is only ever a cache: the database is the source of truth.
+    fetch('/api/user/progress')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { resume?: ResumePoint | null } | null) => {
+        if (cancelled || !data?.resume) return;
+        const resume = data.resume;
+
+        setState({
+          videoId: resume.youtubePlaylistId ? null : resume.youtubeVideoId,
+          playlistId: resume.youtubePlaylistId,
+          playlistIndex: resume.playlistIndex ?? 0,
+        });
+        setRestoredPosition(resume.positionSeconds > 5 ? resume.positionSeconds : null);
+      })
+      .catch(() => {
+        // Offline or the API is down — the app still works, it just opens empty.
+      })
+      .finally(() => {
+        if (!cancelled) setHydrated(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persist = useCallback((next: ShellState, position?: number) => {
-    try {
-      const payload: StoredState = { ...next };
-      if (typeof position === 'number' && Number.isFinite(position)) payload.position = position;
-      localStorage.setItem(STATE_KEY, JSON.stringify(payload));
-    } catch {
-      // Private mode or a full quota — persistence is best-effort.
-    }
+    const payload: StoredPlayerState = { ...next };
+    if (typeof position === 'number' && Number.isFinite(position)) payload.position = position;
+    writePlayerState(payload);
   }, []);
 
   useEffect(() => {

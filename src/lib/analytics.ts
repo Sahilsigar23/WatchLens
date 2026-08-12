@@ -75,6 +75,7 @@ export async function loadSessions(
   until: Date,
 ): Promise<SessionRecord[]> {
   return attachEvents(
+    userId,
     await query<SessionRow>(
       `SELECT ${SESSION_COLUMNS}
          FROM watch_sessions s
@@ -101,6 +102,7 @@ export async function loadSessionsForVideos(
   if (youtubeVideoIds.length === 0) return [];
 
   return attachEvents(
+    userId,
     await query<SessionRow>(
       `SELECT ${SESSION_COLUMNS}
          FROM watch_sessions s
@@ -113,17 +115,27 @@ export async function loadSessionsForVideos(
   );
 }
 
-/** Loads each session's events and replays them into watched spans. */
-async function attachEvents(sessionRows: SessionRow[]): Promise<SessionRecord[]> {
+/**
+ * Loads each session's events and replays them into watched spans.
+ *
+ * The event query re-states `user_id` even though `sessionIds` came from an
+ * already user-filtered query. It is redundant by construction and deliberately
+ * so: it means no future caller can reach this with session ids it did not
+ * own-check, and the redundant filter costs nothing on an indexed column.
+ */
+async function attachEvents(
+  userId: number,
+  sessionRows: SessionRow[],
+): Promise<SessionRecord[]> {
   if (sessionRows.length === 0) return [];
 
   const sessionIds = sessionRows.map((r) => Number(r.session_id));
   const eventRows = await query<EventRow>(
     `SELECT session_id, event_type, video_time, previous_video_time, timestamp
        FROM watch_events
-      WHERE session_id = ANY($1::bigint[])
+      WHERE session_id = ANY($1::bigint[]) AND user_id = $2
       ORDER BY timestamp ASC, id ASC`,
-    [sessionIds],
+    [sessionIds, userId],
   );
 
   const eventsBySession = new Map<number, RawEvent[]>();
@@ -347,6 +359,7 @@ export async function loadHistory(userId: number, limit = 100): Promise<HistoryR
         reachedEnd: stats.reachedEnd,
         lastWatchedAt: video.lastWatchedAt.toISOString(),
         sessionCount: video.sessionCount,
+        lastPositionSeconds: Math.floor(stats.reachedSeconds),
       } satisfies HistoryRow;
     })
     .sort((a, b) => b.lastWatchedAt.localeCompare(a.lastWatchedAt))
@@ -416,9 +429,9 @@ export async function lastPositionFor(
   const eventRows = await query<EventRow>(
     `SELECT session_id, event_type, video_time, previous_video_time, timestamp
        FROM watch_events
-      WHERE session_id = ANY($1::bigint[])
+      WHERE session_id = ANY($1::bigint[]) AND user_id = $2
       ORDER BY timestamp ASC, id ASC`,
-    [rows.map((r) => Number(r.session_id))],
+    [rows.map((r) => Number(r.session_id)), userId],
   );
 
   const bySession = new Map<number, RawEvent[]>();

@@ -7,6 +7,7 @@ import { query, queryOne } from '@/lib/db';
 import { fetchPlaylistItems, fetchPlaylistTitle, MAX_PLAYLIST_ITEMS } from '@/lib/playlist-meta';
 import { resumeIndexFor, summarizePlaylist } from '@/lib/playlist-progress';
 import type { PlaylistSummary } from '@/lib/types';
+import { loadStoredPlaylistItems } from '@/lib/user-data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,10 +43,15 @@ export async function POST(request: Request) {
       ? body.videoIds.filter((id) => typeof id === 'string').slice(0, MAX_PLAYLIST_ITEMS)
       : [];
 
-    const [items, title] = await Promise.all([
+    const [fetched, title] = await Promise.all([
       fetchPlaylistItems(playlistId, playerVideoIds),
       fetchPlaylistTitle(playlistId),
     ]);
+
+    // Neither the Data API nor the browser's player could give us the contents.
+    // If this account has opened the playlist before, our own stored ordering
+    // is a perfectly good answer — that is what persisting it is for.
+    const items = fetched.length > 0 ? fetched : await loadStoredPlaylistItems(playlistId);
 
     if (items.length === 0) {
       return NextResponse.json(

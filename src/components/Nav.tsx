@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
+import { clearPlayerState } from '@/lib/player-state';
+
 const LINKS = [
   { href: '/', label: 'Watch' },
   { href: '/history', label: 'History' },
@@ -13,8 +15,17 @@ export function Nav({ email }: { email: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  /**
+   * Ends the authentication session only.
+   *
+   * Nothing is deleted: history, analytics, playlists and progress all stay in
+   * the database against this account and come back on the next sign-in. The
+   * only thing cleared is the browser's cached "which video was on screen",
+   * so the next person to use this browser does not inherit it.
+   */
   const signOut = async () => {
     await fetch('/api/auth', { method: 'DELETE' });
+    clearPlayerState();
     router.refresh();
   };
 

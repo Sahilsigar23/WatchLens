@@ -61,6 +61,24 @@ CREATE TABLE IF NOT EXISTS watch_events (
 CREATE INDEX IF NOT EXISTS watch_events_session_idx
   ON watch_events (session_id, timestamp, id);
 
+-- Ownership is recorded directly on the event as well as through its session.
+-- Strictly it is derivable via watch_sessions, but carrying it here means an
+-- ownership check never depends on remembering to join, and any query that
+-- forgets the filter fails closed on an obviously-missing column rather than
+-- silently returning another user's rows.
+ALTER TABLE watch_events ADD COLUMN IF NOT EXISTS user_id BIGINT
+  REFERENCES users(id) ON DELETE CASCADE;
+
+-- Backfill before the NOT NULL below, so an existing database upgrades cleanly.
+UPDATE watch_events e
+   SET user_id = s.user_id
+  FROM watch_sessions s
+ WHERE e.session_id = s.id AND e.user_id IS NULL;
+
+ALTER TABLE watch_events ALTER COLUMN user_id SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS watch_events_user_idx ON watch_events (user_id);
+
 -- A retried batch inserts the same client_event_id twice; this makes the second
 -- insert a no-op instead of a duplicate PLAY that would corrupt the intervals.
 CREATE UNIQUE INDEX IF NOT EXISTS watch_events_client_event_id_key

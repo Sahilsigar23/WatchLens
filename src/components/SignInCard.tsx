@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { clearPlayerState } from '@/lib/player-state';
+
 /**
  * Email-only sign-in.
  *
@@ -31,6 +33,11 @@ export function SignInCard() {
         const data = (await response.json()) as { error?: string };
         throw new Error(data.error ?? 'Could not sign in.');
       }
+
+      // Drop any cached player state left by a previous account on this
+      // browser. This user's own video, playlist and position are restored
+      // from the server instead — see /api/user/progress.
+      clearPlayerState();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in.');

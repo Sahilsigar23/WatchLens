@@ -106,6 +106,51 @@ index and position are mirrored to `localStorage` and the video reopens where yo
 
 ---
 
+## Your data belongs to your account
+
+Everything StudyTrace records is stored in Postgres against the authenticated
+`user_id` — never in the browser. Sign out, clear the browser, switch to your phone: sign back in
+and it is all still there.
+
+**Persisted per account:** watch history · actual watched time · skipped time · watch sessions ·
+raw playback events · per-video progress and last position · playlists · playlist progress · daily
+and weekly statistics · study and entertainment time · resume point.
+
+**Signing out ends the session and nothing else.** No history, analytics, playlist or statistic is
+deleted, and no rows are touched. The only thing cleared is the browser's cached "which video was
+on screen", so the next person to use that browser does not inherit it. Deleting data is a separate,
+explicit action on `/privacy`.
+
+**localStorage holds one thing:** which video is currently open, plus volume and speed. It is a
+cache for surviving a page refresh. When it is empty — a new device, a cleared browser, a fresh
+login — the player asks `GET /api/user/progress` and restores from the database instead.
+
+### Isolation
+
+Every user-scoped query filters on the id from the session cookie, resolved on the server. There is
+no endpoint that takes a user id as a parameter, so there is nothing to tamper with:
+
+- Reads (`loadSessions`, `loadHistory`, `coverageForVideos`, `lastPositionFor`, everything in
+  `user-data.ts`) all filter by `user_id`.
+- `watch_events` carries its own `user_id` alongside `session_id`. It is derivable through the
+  session, but storing it means an ownership check never depends on remembering to join.
+- Writes verify ownership first: `POST /api/events` filters the submitted session ids to those
+  belonging to the caller and rejects the batch otherwise. The `user_id` written comes from the
+  cookie, never the request body.
+- The browser is never trusted to scope anything.
+
+`tests/integration/user-isolation.test.ts` proves this against a real Postgres — two accounts, and
+assertions that neither can see or write the other's rows. It skips when `DATABASE_URL` is unset:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/studytrace npm test
+```
+
+Video and playlist *metadata* (title, channel, duration, the playlist's contents) is deliberately
+shared across accounts — it is public YouTube data and describes nobody. Only watching does.
+
+---
+
 ## Tech stack
 
 | Layer | Choice |
@@ -195,8 +240,8 @@ playlists        id · youtube_playlist_id · title · created_at
 playlist_items   playlist_id → playlists · position · video_id → videos
 watch_sessions   id · user_id → users · video_id → videos · started_at · ended_at
                  · playlist_id → playlists (nullable) · playlist_index (nullable)
-watch_events     id · session_id → watch_sessions · event_type · video_time · previous_video_time
-                 · timestamp · client_event_id
+watch_events     id · session_id → watch_sessions · user_id → users · event_type · video_time
+                 · previous_video_time · timestamp · client_event_id
 ```
 
 A playlist holds no watch data of its own — every figure on the playlist panel is derived from the
@@ -226,8 +271,15 @@ Two details worth knowing:
 | `GET /api/stats/today?tz=` | today's learning report |
 | `GET /api/stats/weekly?tz=` | Monday–Sunday rollup |
 | `GET /api/history` | all-time per-video table |
+| `GET /api/user/history` | the account's watch history |
+| `GET /api/user/playlists` | every playlist watched, with progress and resume index |
+| `GET /api/user/statistics?tz=` | today + this week + all-time totals |
+| `GET /api/user/progress` | per-video progress and the point to resume from |
 | `GET /api/search?q=` | optional YouTube search (metadata only) |
 | `DELETE /api/account?scope=history\|account` | erase history or the whole account |
+
+Every route above resolves the user from the session cookie server-side and returns `401` when
+signed out. None of them accept a user id.
 
 ---
 
@@ -303,6 +355,7 @@ src/
     history/page.tsx      per-video history
     privacy/page.tsx      disclosure + delete controls
     api/                  auth · session · events · playlist · stats · history · search · account
+    api/user/             history · playlists · statistics · progress (account-scoped reads)
   components/
     AppShell.tsx          ★ persistent layout + stats-refresh signal
     PlayerShell.tsx       ★ player state, playlist state, expanded / mini-player
@@ -322,6 +375,8 @@ src/
     watch-time.ts         ★ the algorithm
     intervals.ts          merge / union / clamp
     analytics.ts          event log → daily, weekly, history, per-video coverage
+    user-data.ts          account-scoped reads: playlists, progress, resume, lifetime totals
+    player-state.ts       the one thing kept in localStorage, cleared on sign-in/out
     playlist-progress.ts  coverage → sidebar rows + playlist panel (pure)
     playlist-meta.ts      playlist contents: Data API, or player ids + oEmbed
     tracker.ts            batching, retry, sendBeacon, session windows
@@ -331,9 +386,12 @@ src/
     db · auth · dates · format · types
 tests/
   watch-time.test.ts      19 tests, including the exact example from the brief
-  playlist.test.ts        15 tests
+  playlist.test.ts        16 tests
   classify.test.ts        6 tests
   tracker.test.ts         5 tests
+  query-params.test.ts    3 tests
+  integration/
+    user-isolation.test.ts  8 tests against a real Postgres; skipped without DATABASE_URL
 ```
 
 ---

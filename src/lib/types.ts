@@ -82,6 +82,31 @@ export interface HistoryRow {
   reachedEnd: boolean;
   lastWatchedAt: string;
   sessionCount: number;
+  /** Furthest point reached — where a returning viewer should resume. */
+  lastPositionSeconds: number;
+}
+
+/** One playlist this user has watched from, with their progress in it. */
+export interface UserPlaylistSummary {
+  youtubePlaylistId: string;
+  title: string;
+  lastWatchedAt: string;
+  /** Index of the video to continue from. */
+  resumeIndex: number | null;
+  analytics: PlaylistAnalytics;
+}
+
+/**
+ * Everything needed to put a user back where they were — on any device.
+ * Read from the database, never from browser storage.
+ */
+export interface ResumePoint {
+  youtubeVideoId: string;
+  title: string;
+  youtubePlaylistId: string | null;
+  playlistIndex: number | null;
+  positionSeconds: number;
+  lastWatchedAt: string;
 }
 
 /** Where a video stands, for the playlist sidebar's ✓ / ▶ / ○ markers. */
