@@ -1,18 +1,18 @@
+import { LandingSurface } from '@/components/LandingSurface';
 import { guardSection } from '@/lib/page-guard';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Watch — the landing page.
+ * `/` — the landing page, and where the WatchLens mark points.
  *
- * Deliberately almost empty: the search box, player, playlist sidebar and video
- * information are all rendered by PlayerShell inside the layout, which is what
- * keeps them alive across navigation. Putting them in this page instead would
- * unmount the iframe every time the user visited another section.
+ * It is a real destination rather than an alias for the player: the coverage
+ * figure that explains the product, the input, and what you were last watching.
+ * A video already open stays open in the corner mini-player while you are here,
+ * because the player is mounted by the layout and survives navigation.
  *
- * Analytics live in their own sections (/today, /weekly, /history, /playlists)
- * so this page stays a watching surface rather than a dashboard.
+ * The full-size player lives at `/watch`.
  */
-export default async function WatchPage() {
-  return (await guardSection()) ?? null;
+export default async function LandingPage() {
+  return (await guardSection()) ?? <LandingSurface />;
 }

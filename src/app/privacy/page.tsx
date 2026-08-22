@@ -29,10 +29,10 @@ export default async function PrivacyPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="measure-wide space-y-8">
       <header className="space-y-1.5">
         <h1 className="text-xl font-semibold tracking-tight">Privacy &amp; tracking</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-dim">
           WatchLens only measures videos you deliberately open on this site. Everything it records
           is listed below — there is no hidden collection.
         </p>
@@ -40,15 +40,15 @@ export default async function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">What is recorded</h2>
-        <ul className="card divide-y divide-line">
+        <ul className="panel divide-y divide-rule">
           {TRACKED.map(([what, why]) => (
             <li key={what} className="px-4 py-3">
               <p className="text-sm font-medium">{what}</p>
-              <p className="text-sm text-muted">{why}</p>
+              <p className="text-sm text-dim">{why}</p>
             </li>
           ))}
         </ul>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-dim">
           Events are sent to our server in small batches roughly every ten seconds, plus once when
           you close the page. They are stored in a Postgres database that only this application
           reads.
@@ -57,7 +57,7 @@ export default async function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">What is never recorded</h2>
-        <ul className="card space-y-2 p-4 text-sm text-muted">
+        <ul className="panel space-y-2 p-4 text-sm text-dim">
           {NOT_TRACKED.map((item) => (
             <li key={item}>— {item}</li>
           ))}
@@ -66,7 +66,7 @@ export default async function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">How video playback works</h2>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-dim">
           Video is streamed by YouTube straight to your browser through the official embedded
           player. It is never proxied, downloaded, cached or re-served by this application, which
           only ever handles the small JSON events described above. YouTube sets its own cookies and
@@ -76,13 +76,13 @@ export default async function PrivacyPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Sign-in, honestly</h2>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-dim">
           Accounts are protected by a password, hashed with scrypt and never stored in readable
           form. Repeated failed sign-ins temporarily lock the account, and the form gives the same
           answer for an unknown address as for a wrong password, so it cannot be used to find out
           who has an account here.
         </p>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-dim">
           Two things it does not do: email addresses are not verified, and there is no password
           reset — that needs a mail provider this app does not have. If you forget your password,
           delete the account below and sign up again.
@@ -92,7 +92,7 @@ export default async function PrivacyPage() {
       {signedIn ? (
         <DataControls />
       ) : (
-        <p className="card p-5 text-sm text-muted">Sign in to delete your history or account.</p>
+        <p className="panel p-5 text-sm text-dim">Sign in to delete your history or account.</p>
       )}
     </div>
   );

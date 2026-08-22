@@ -29,7 +29,9 @@ export type IconName =
   | 'trash'
   | 'close'
   | 'menu'
-  | 'user';
+  | 'user'
+  | 'sun'
+  | 'moon';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // The identity mark: a lens — an eye whose pupil is a play triangle.
@@ -94,6 +96,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
     </>
   ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+    </>
+  ),
+  moon: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
@@ -124,18 +133,21 @@ export function Icon({ name, size = 18, ...rest }: IconProps) {
   );
 }
 
-/** The WatchLens mark: a gradient lens tile. */
-export function Logo({ size = 30 }: { size?: number }) {
+/**
+ * The WatchLens mark: the lens drawn in sodium on the panel ground, inside a
+ * hairline tile.
+ *
+ * Flat rather than a gradient chip on purpose — sodium means "watched" all
+ * through this interface, and the mark is the one place it is allowed to mean
+ * the product itself.
+ */
+export function Logo({ size = 28 }: { size?: number }) {
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-xl text-white"
-      style={{
-        width: size,
-        height: size,
-        backgroundImage: 'linear-gradient(135deg, var(--color-brand), var(--color-accent))',
-      }}
+      className="grid shrink-0 place-items-center rounded-lg border border-rule bg-panel text-signal"
+      style={{ width: size, height: size }}
     >
-      <Icon name="lens" size={Math.round(size * 0.6)} strokeWidth={1.9} />
+      <Icon name="lens" size={Math.round(size * 0.62)} strokeWidth={1.8} />
     </span>
   );
 }

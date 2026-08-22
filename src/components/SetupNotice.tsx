@@ -6,14 +6,14 @@ export function SetupNotice({ detail }: { detail?: string }) {
   return (
     <div className="mx-auto max-w-xl space-y-4 pt-10">
       <h1 className="text-2xl font-semibold tracking-tight">Almost there</h1>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-dim">
         WatchLens needs a database and a session secret before it can run.
       </p>
 
-      <ol className="card space-y-3 p-5 text-sm">
+      <ol className="panel space-y-3 p-5 text-sm">
         <li>
           <span className="font-medium">1.</span> Copy the example env file:
-          <pre className="mt-1 overflow-x-auto rounded-lg bg-canvas p-3 text-xs">
+          <pre className="mt-1 overflow-x-auto rounded-lg bg-ground p-3 text-xs">
             cp .env.example .env.local
           </pre>
         </li>
@@ -23,7 +23,7 @@ export function SetupNotice({ detail }: { detail?: string }) {
         </li>
         <li>
           <span className="font-medium">3.</span> Create the tables:
-          <pre className="mt-1 overflow-x-auto rounded-lg bg-canvas p-3 text-xs">
+          <pre className="mt-1 overflow-x-auto rounded-lg bg-ground p-3 text-xs">
             npm run db:migrate
           </pre>
         </li>
@@ -32,7 +32,7 @@ export function SetupNotice({ detail }: { detail?: string }) {
         </li>
       </ol>
 
-      {detail && <p className="text-xs text-muted">Details: {detail}</p>}
+      {detail && <p className="text-xs text-dim">Details: {detail}</p>}
     </div>
   );
 }

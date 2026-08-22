@@ -72,8 +72,31 @@ export function AppShell({ signedIn, children }: { signedIn: boolean; children: 
   return (
     <StatsRefreshContext.Provider value={version}>
       <PlayerCommandContext.Provider value={commands}>
-        {/* pb-28 on mobile clears the fixed bottom tab bar. */}
-        <div className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 md:pb-16">
+        {/*
+          `.shell` owns the horizontal measure and gutters for the whole app —
+          the header uses the same class, so the brand mark lines up with the
+          content beneath it at every width.
+
+          Bottom padding has to clear whatever is docked over the page: the tab
+          bar alone on Watch, the tab bar *and* the mini-player dock everywhere
+          else. Without the larger value the last row of a list sits permanently
+          underneath the dock and cannot be scrolled into view. Both go away at
+          `lg`, where the tab bar is replaced by the header rail.
+        */}
+        <div
+          className={`shell pt-5 lg:pt-8 ${
+            /*
+             * `/watch` is the one route with no docked mini-player, because the
+             * player is laid out in flow there — so it only has to clear the
+             * mobile tab bar. Every other route, the landing page included, must
+             * also clear the dock, which occupies ~216px of the bottom-right
+             * corner (192px tall plus its 24px offset). Under-reserving here is
+             * not cosmetic: the last row of a short list ends up permanently
+             * underneath the dock with no way to scroll it into view.
+             */
+            pathname === '/watch' ? 'pb-28 lg:pb-16' : 'pb-44 lg:pb-56'
+          }`}
+        >
           {signedIn && <PlayerShell onSessionChange={bump} request={request} />}
           {/*
             Keyed by route so the section fades up on each navigation. Only

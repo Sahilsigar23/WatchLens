@@ -41,11 +41,11 @@ export function PlaylistsPanel() {
 
   const open = (playlist: UserPlaylistSummary) => {
     openPlaylist(playlist.youtubePlaylistId);
-    router.push('/');
+    router.push('/watch');
   };
 
   if (failed) {
-    return <p className="card p-6 text-sm text-muted">Could not load playlists. Try reloading.</p>;
+    return <p className="panel p-6 text-sm text-dim">Could not load playlists. Try reloading.</p>;
   }
 
   if (playlists === null) {
@@ -60,12 +60,12 @@ export function PlaylistsPanel() {
 
   if (playlists.length === 0) {
     return (
-      <div className="card flex flex-col items-center gap-3 p-10 text-center">
-        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-canvas text-muted">
+      <div className="panel flex flex-col items-center gap-3 p-10 text-center">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-ground text-dim">
           <Icon name="list" size={22} />
         </span>
         <p className="text-sm font-medium">No courses yet</p>
-        <p className="max-w-xs text-sm text-muted">
+        <p className="max-w-xs text-sm text-dim">
           Paste a YouTube playlist link on the Watch page and it will appear here as a course you
           can work through.
         </p>
@@ -80,43 +80,43 @@ export function PlaylistsPanel() {
         const done = a.videoCount > 0 ? a.completed / a.videoCount : 0;
 
         return (
-          <article key={playlist.youtubePlaylistId} className="card card-hover overflow-hidden">
+          <article key={playlist.youtubePlaylistId} className="panel panel-action overflow-hidden">
             <div className="flex flex-wrap items-start justify-between gap-4 p-5">
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-base font-semibold tracking-tight sm:text-lg">
                   {playlist.title || 'Playlist'}
                 </h2>
-                <p className="mt-0.5 text-xs text-muted">
+                <p className="mt-0.5 text-xs text-dim">
                   {a.completed} / {a.videoCount} videos completed · last opened{' '}
                   {formatDate(playlist.lastWatchedAt)}
                 </p>
               </div>
 
-              <button type="button" onClick={() => open(playlist)} className="btn btn-primary">
+              <button type="button" onClick={() => open(playlist)} className="btn btn-signal">
                 <Icon name="play" size={12} />
                 {playlist.resumeIndex !== null ? 'Continue learning' : 'Start'}
               </button>
             </div>
 
             <div className="px-5">
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-canvas">
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-ground">
                 <div
-                  className="animate-grow h-full"
+                  className="animate-wipe h-full"
                   style={{
                     width: `${done * 100}%`,
                     backgroundImage:
-                      'linear-gradient(90deg, var(--color-brand), var(--color-accent))',
+                      'linear-gradient(90deg, var(--color-signal), var(--color-signal-deep))',
                   }}
                 />
               </div>
-              <p className="mt-1.5 text-xs text-muted">
+              <p className="mt-1.5 text-xs text-dim">
                 {formatPercentage(done)} of the course complete
                 {a.totalDurationSeconds > 0 &&
                   ` · ${formatPercentage(a.progress)} of its runtime actually watched`}
               </p>
             </div>
 
-            <dl className="mt-4 grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+            <dl className="mt-4 grid grid-cols-2 gap-px border-t border-rule bg-rule sm:grid-cols-4">
               <Cell label="Actual learning" value={formatDuration(a.watchedSeconds)} highlight />
               <Cell
                 label="Total length"
@@ -127,7 +127,7 @@ export function PlaylistsPanel() {
             </dl>
 
             {a.durationsIncomplete && (
-              <p className="border-t border-line px-5 py-2.5 text-xs text-muted">
+              <p className="border-t border-rule px-5 py-2.5 text-xs text-dim">
                 Some durations are still unknown — they fill in as you open each video.
               </p>
             )}
@@ -148,9 +148,9 @@ function Cell({
   highlight?: boolean;
 }) {
   return (
-    <div className="bg-surface px-5 py-3">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className={`stat mt-0.5 text-base font-semibold ${highlight ? 'gradient-text' : ''}`}>
+    <div className="bg-panel px-5 py-3">
+      <dt className="text-xs text-dim">{label}</dt>
+      <dd className={`data mt-0.5 text-base font-semibold ${highlight ? 'text-signal' : ''}`}>
         {value}
       </dd>
     </div>

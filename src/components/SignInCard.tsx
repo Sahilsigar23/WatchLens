@@ -62,29 +62,22 @@ export function SignInCard() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 pt-10 sm:pt-16">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <span
-          className="grid h-14 w-14 place-items-center rounded-2xl text-white"
-          style={{
-            backgroundImage: 'linear-gradient(135deg, var(--color-brand), var(--color-accent))',
-            boxShadow: '0 18px 40px -18px color-mix(in oklab, var(--color-brand) 90%, transparent)',
-          }}
-        >
-          <Icon name="lens" size={28} strokeWidth={1.8} />
+      <div className="space-y-4">
+        <span className="grid h-11 w-11 place-items-center rounded-lg border border-rule bg-panel text-signal">
+          <Icon name="lens" size={22} strokeWidth={1.8} />
         </span>
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Watch<span className="gradient-text">Lens</span>
-          </h1>
-          <p className="text-sm text-muted">
-            See how much of each YouTube video you actually watched — not how much of it played.
+        <div className="space-y-2">
+          <h1 className="display text-3xl">WatchLens</h1>
+          <p className="text-sm leading-relaxed text-dim">
+            See how much of each YouTube video you{' '}
+            <span className="text-text">actually watched</span> — not how much of it played.
           </p>
         </div>
       </div>
 
-      <form onSubmit={submit} className="card space-y-3 p-5">
+      <form onSubmit={submit} className="panel space-y-4 p-5">
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-sm font-medium">
+          <label htmlFor="email" className="eyebrow block">
             Email
           </label>
           <input
@@ -96,12 +89,12 @@ export function SignInCard() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="input"
+            className="field"
           />
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-sm font-medium">
+          <label htmlFor="password" className="eyebrow block">
             Password
           </label>
           <input
@@ -116,7 +109,7 @@ export function SignInCard() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder={mode === 'signup' ? `At least ${MIN_PASSWORD_LENGTH} characters` : '••••••••'}
-            className="input"
+            className="field"
           />
         </div>
 
@@ -129,7 +122,7 @@ export function SignInCard() {
         <button
           type="submit"
           disabled={busy}
-          className="btn btn-primary w-full"
+          className="btn btn-signal w-full"
         >
           {busy
             ? mode === 'signup'
@@ -140,18 +133,18 @@ export function SignInCard() {
               : 'Sign in'}
         </button>
 
-        <p className="text-center text-sm text-muted">
+        <p className="text-center text-sm text-dim">
           {mode === 'signup' ? 'Already have an account?' : 'No account yet?'}{' '}
           <button
             type="button"
             onClick={switchMode}
-            className="underline underline-offset-2 hover:text-ink"
+            className="underline underline-offset-2 hover:text-text"
           >
             {mode === 'signup' ? 'Sign in' : 'Create one'}
           </button>
         </p>
 
-        <p className="text-xs text-muted">
+        <p className="text-xs text-dim">
           Your password is hashed with scrypt and never stored in readable form. There is no
           password reset yet — recovering an account means deleting it from the privacy page and
           signing up again.
