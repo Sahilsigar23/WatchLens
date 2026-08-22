@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { VideoChange } from '@/components/YouTubePlayer';
 import { EventTracker } from '@/lib/tracker';
-import type { EventType } from '@/lib/types';
+import type { EventType, Interval } from '@/lib/types';
 import { PlayerState, type YouTubePlayer as Player } from '@/lib/youtube';
 import { buildIntervals, computeWatchStats, type RawEvent } from '@/lib/watch-time';
 
@@ -42,6 +42,12 @@ export interface LiveStats {
   reachedSeconds: number;
   watchedPercentage: number;
   reachedEnd: boolean;
+  /**
+   * The merged watched spans themselves, so the coverage ribbon can draw which
+   * parts of the timeline were played rather than only how many seconds. Already
+   * computed by `computeWatchStats` — this just stops throwing it away.
+   */
+  intervals: Interval[];
 }
 
 const EMPTY_STATS: LiveStats = {
@@ -51,6 +57,7 @@ const EMPTY_STATS: LiveStats = {
   reachedSeconds: 0,
   watchedPercentage: 0,
   reachedEnd: false,
+  intervals: [],
 };
 
 /** How long to wait for the player to report a title and duration. */
@@ -151,6 +158,7 @@ export function useWatchTracker(playlistId: string | null, onSessionChange?: () 
       reachedSeconds: stats.reachedSeconds,
       watchedPercentage: stats.watchedPercentage,
       reachedEnd: stats.reachedEnd,
+      intervals: stats.intervals,
     });
   }, []);
 

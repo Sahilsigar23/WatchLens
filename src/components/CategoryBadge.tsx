@@ -10,7 +10,7 @@ export function CategoryBadge({ category }: { category: Category }) {
   const style = STYLES[category] ?? STYLES.OTHER;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-xs font-medium"
+      className="inline-flex items-center gap-1.5 rounded-full border border-rule px-2 py-0.5 text-xs font-medium"
       style={{ color: style.color }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.color }} />

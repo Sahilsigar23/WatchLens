@@ -4,14 +4,20 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { Icon, Logo, type IconName } from '@/components/Icon';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { clearPlayerState } from '@/lib/player-state';
 
 /**
  * Every section is a route, so moving between them is client-side navigation
  * and the player in the layout is never unmounted. See AppShell.
+ *
+ * Watch, Today and Weekly are the product's three surfaces; History and
+ * Playlists are the drill-downs behind them. The order is the order of use.
  */
 const LINKS: { href: string; label: string; icon: IconName }[] = [
-  { href: '/', label: 'Watch', icon: 'play' },
+  // `/watch`, not `/` — the brand mark owns `/` (the landing page), so the
+  // Watch tab points at the player surface itself.
+  { href: '/watch', label: 'Watch', icon: 'play' },
   { href: '/today', label: 'Today', icon: 'clock' },
   { href: '/weekly', label: 'Weekly', icon: 'calendar' },
   { href: '/history', label: 'History', icon: 'history' },
@@ -40,101 +46,104 @@ export function Nav({ email }: { email: string | null }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/" className="flex h-11 shrink-0 items-center gap-2.5">
+      <header className="sticky top-0 z-30 border-b border-rule bg-ground/85 backdrop-blur-xl">
+        <div className="shell flex h-14 items-center gap-3 sm:gap-4">
+          {/* `min-h-11` gives the brand a 44px tap target inside the 56px
+              header — the mark itself is only 28px, which is comfortable to
+              click but small to thumb. */}
+          <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2.5">
             <Logo />
-            <span className="text-[0.95rem] font-semibold tracking-tight">WatchLens</span>
+            <span className="display text-[0.9375rem] tracking-tight">WatchLens</span>
           </Link>
 
           {email && (
-            // Desktop only — the mobile tab bar below carries these instead, so
-            // the header never has to scroll sideways.
-            <nav className="hidden items-center gap-1 md:flex">
+            /*
+             * From `lg` only. Five labelled links plus the brand, sign-out, the
+             * theme toggle and the avatar do not fit a 768px header without
+             * shrinking the labels to nothing — so tablets keep the bottom tab
+             * bar, which is a better pattern at that size anyway. Below `lg`
+             * this rail is absent rather than scrollable: nothing is hidden.
+             */
+            <nav className="ml-2 hidden items-center rounded-lg border border-rule p-0.5 lg:flex">
               {LINKS.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   aria-current={isActive(link.href) ? 'page' : undefined}
-                  className={`relative rounded-lg px-3 py-2 text-sm transition-colors ${
-                    isActive(link.href) ? 'text-ink' : 'text-muted hover:text-ink'
+                  className={`flex items-center gap-2 rounded-[0.3125rem] px-3 py-1.5 text-[0.8125rem] transition-colors ${
+                    isActive(link.href)
+                      ? 'bg-panel-2 text-text'
+                      : 'text-dim hover:text-text'
                   }`}
                 >
-                  {link.label}
-                  {/*
-                    The active indicator. Rendered on every item and only made
-                    visible on the current one, so it is a width/opacity
-                    transition rather than an element appearing from nowhere.
-                  */}
+                  {/* The active marker is a sodium tick, not an underline —
+                      one accent, used the same way everywhere. */}
                   <span
                     aria-hidden
-                    className={`absolute inset-x-3 -bottom-px h-0.5 rounded-full transition-all duration-200 ${
-                      isActive(link.href) ? 'opacity-100' : 'scale-x-0 opacity-0'
+                    className={`h-1 w-1 rounded-full transition-colors ${
+                      isActive(link.href) ? 'bg-signal' : 'bg-transparent'
                     }`}
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(90deg, var(--color-brand), var(--color-accent))',
-                    }}
                   />
+                  {link.label}
                 </Link>
               ))}
             </nav>
           )}
 
-          {email && (
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <Link
-                href="/settings"
-                aria-label="Settings"
-                aria-current={isActive('/settings') ? 'page' : undefined}
-                title={email}
-                className={`grid h-10 w-10 place-items-center rounded-full border transition-colors ${
-                  isActive('/settings')
-                    ? 'border-brand text-ink'
-                    : 'border-line text-muted hover:text-ink'
-                }`}
-              >
-                <span className="text-xs font-semibold uppercase">{email.slice(0, 1)}</span>
-              </Link>
-              <button type="button" onClick={signOut} className="btn btn-ghost hidden sm:inline-flex">
-                Sign out
-              </button>
-            </div>
-          )}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* Available signed out too — the sign-in screen should honour the
+                chosen theme like everything else. */}
+            <ThemeToggle />
+
+            {email && (
+              <>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="btn btn-quiet hidden h-9 min-h-0 sm:inline-flex"
+                >
+                  Sign out
+                </button>
+                <Link
+                  href="/settings"
+                  aria-label="Settings"
+                  aria-current={isActive('/settings') ? 'page' : undefined}
+                  title={email}
+                  className={`data grid h-9 w-9 place-items-center rounded-lg border text-xs uppercase transition-colors ${
+                    isActive('/settings')
+                      ? 'border-signal text-signal'
+                      : 'border-rule text-dim hover:text-text'
+                  }`}
+                >
+                  {email.slice(0, 1)}
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
       {/*
-        Mobile navigation. A bottom tab bar rather than a menu: it is reachable
-        one-handed and, unlike a scrolling row of links, nothing is hidden.
-        PlayerShell offsets the mini-player above it so the two never overlap.
+        Phone and tablet navigation. A bottom tab bar rather than a menu: it is
+        reachable one-handed and, unlike a scrolling row of links, nothing is
+        hidden behind a tap. PlayerShell offsets the mini-player above it so the
+        two never overlap. Hidden from `lg`, where the header rail takes over.
       */}
       {email && (
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 backdrop-blur-xl md:hidden">
-          <ul className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)]">
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rule bg-ground/95 backdrop-blur-xl lg:hidden">
+          <ul className="mx-auto flex max-w-md items-stretch justify-between px-1 pb-[env(safe-area-inset-bottom)]">
             {LINKS.map((link) => (
               <li key={link.href} className="flex-1">
                 <Link
                   href={link.href}
                   aria-current={isActive(link.href) ? 'page' : undefined}
-                  className={`flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors ${
-                    isActive(link.href) ? 'text-ink' : 'text-muted'
+                  /* 56px min target: comfortably above the 44px floor. */
+                  className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[0.625rem] font-medium transition-colors ${
+                    isActive(link.href) ? 'text-text' : 'text-dim'
                   }`}
                 >
-                  <span
-                    className={`grid h-8 w-12 place-items-center rounded-full transition-colors ${
-                      isActive(link.href) ? 'bg-surface' : ''
-                    }`}
-                    style={
-                      isActive(link.href)
-                        ? {
-                            backgroundImage:
-                              'linear-gradient(135deg, color-mix(in oklab, var(--color-brand) 26%, transparent), color-mix(in oklab, var(--color-accent) 20%, transparent))',
-                          }
-                        : undefined
-                    }
-                  >
-                    <Icon name={link.icon} size={17} />
+                  <span className={isActive(link.href) ? 'text-signal' : ''}>
+                    <Icon name={link.icon} size={18} />
                   </span>
                   {link.label}
                 </Link>

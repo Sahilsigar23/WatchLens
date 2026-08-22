@@ -1,62 +1,137 @@
 @import 'tailwindcss';
 
 /*
- * WatchLens design tokens — dark first.
+ * WatchLens design tokens — "instrument, not dashboard".
  *
- * The dark palette is the default in @theme; the light block below restates
- * only the surface/text variables for people whose system asks for light. Every
- * component reads the same `bg-surface` / `text-ink` / `border-line` utilities,
- * so neither theme needs a `dark:` variant anywhere.
+ * The product measures one thing: how much of a timeline you genuinely
+ * occupied. So the interface is built like a measuring instrument rather than
+ * an analytics dashboard — a dark slate-green ground, hairline rules, and a
+ * single sodium-amber signal reserved for one meaning: ACTUALLY WATCHED.
  *
- * Identity: indigo → cyan, a "lens" gradient. Deliberately not YouTube red —
- * YouTube is the video source, WatchLens is the product around it.
+ * Colour is a vocabulary here, not decoration:
+ *   signal  — time genuinely played. The only warm colour in the app.
+ *   ghost   — time skipped past. Inert, hollow, deliberately unattractive.
+ *   rule    — structure. Hairlines, axes, ticks.
+ *   study / fun / other — category encoding ONLY. Never used for chrome.
+ *
+ * Nothing else gets an accent. If a colour appears, it means something.
  */
 @theme {
-  --color-canvas: #08080b;
-  --color-surface: #101017;
-  --color-raised: #17171f;
-  --color-line: #23232e;
-  --color-ink: #f2f2f5;
-  --color-muted: #8b8b9a;
+  /* Ground: a green-cast black, not a neutral one. Reads as an instrument
+     panel rather than a generic dark theme. */
+  --color-ground: #0a0f0d;
+  --color-panel: #111815;
+  --color-panel-2: #18211d;
+  --color-rule: #232e29;
+  --color-text: #e9f0ec;
+  --color-dim: #7c8d86;
 
-  --color-brand: #6d5efc;
-  --color-accent: #22d3ee;
+  /* The one accent. Sodium amber = time you actually watched. */
+  --color-signal: #f2a63b;
+  --color-signal-deep: #c97b22;
 
-  --color-study: #4f8cff;
-  --color-fun: #f7a53b;
-  --color-other: #a78bfa;
-  --color-skip: #5b5b6b;
-  --color-danger: #f8717a;
+  /* Skipped time. Hollow and inert on purpose — it should not look like an
+     achievement. */
+  --color-ghost: #3b4a45;
 
-  --radius-card: 1rem;
+  /* Category encoding only. */
+  --color-study: #63d2b0;
+  --color-fun: #e2705a;
+  --color-other: #9a8fd8;
+  --color-danger: #ef6f6f;
+
+  --radius-panel: 0.875rem;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', monospace;
 }
 
+/*
+ * Light mode restates only ground, text and structure. Ghost and the category
+ * hues keep their meaning across both themes — `ghost` lightens because its job
+ * is to stay *recessive*, and signal darkens because sodium-on-white at the
+ * dark-mode value fails contrast against a white panel.
+ *
+ * Theme resolution: the boot script in `layout.tsx` always stamps a concrete
+ * `data-theme` on <html> before first paint, resolving a stored choice or the
+ * OS preference. So the palette is selected by attribute alone — one source of
+ * truth, no duplicated block, and no flash of the wrong theme. The media query
+ * below is a no-JS fallback only, scoped so it can never override an explicit
+ * choice.
+ */
+:root[data-theme='light'] {
+  --color-ground: #f4f6f4;
+  --color-panel: #ffffff;
+  --color-panel-2: #fbfcfb;
+  --color-rule: #e2e7e3;
+  --color-text: #101613;
+  --color-dim: #5f6f68;
+  --color-ghost: #c8d1cc;
+  --color-signal: #b9741a;
+  --color-signal-deep: #8f560f;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* No script: fall back to the OS preference. Never applies once a theme is
+   stamped, because both `data-theme` values are excluded. */
 @media (prefers-color-scheme: light) {
-  :root {
-    --color-canvas: #f7f7f9;
-    --color-surface: #ffffff;
-    --color-raised: #ffffff;
-    --color-line: #e6e6ec;
-    --color-ink: #16161d;
-    --color-muted: #63636f;
-    --color-skip: #b6b6c2;
+  :root:not([data-theme]) {
+    --color-ground: #f4f6f4;
+    --color-panel: #ffffff;
+    --color-panel-2: #fbfcfb;
+    --color-rule: #e2e7e3;
+    --color-text: #101613;
+    --color-dim: #5f6f68;
+    --color-ghost: #c8d1cc;
+    --color-signal: #b9741a;
+    --color-signal-deep: #8f560f;
+    color-scheme: light;
   }
 }
 
 html {
-  color-scheme: dark light;
+  color-scheme: dark;
+}
+
+/*
+ * Applied to <html> for a moment while the theme flips, then removed.
+ *
+ * Scoped to a transient class rather than left on permanently: a standing
+ * `transition: background-color` on every element makes hover states feel
+ * laggy, which is a real cost paid all the time for an effect seen once.
+ */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    fill 220ms ease !important;
 }
 
 body {
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
+  background-color: var(--color-ground);
+  color: var(--color-text);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 /*
- * A single soft light source behind the whole app. Fixed and pointer-events
- * free so it never enters layout or intercepts a click on the player.
+ * A faint horizontal scan across the top of the ground — the instrument's
+ * light, not a decorative blob. Fixed and pointer-events free so it never
+ * enters layout or intercepts a click on the player.
+ *
+ * `inset: 0` on a fixed element covers the viewport at any size, which the
+ * previous radial-blob version did not: it was sized in `rem` and left a hard
+ * rectangular edge on wide screens.
  */
 body::before {
   content: '';
@@ -64,142 +139,279 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(60rem 40rem at 15% -10%, color-mix(in oklab, var(--color-brand) 16%, transparent), transparent 70%),
-    radial-gradient(50rem 35rem at 90% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent 70%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-signal) 5%, transparent) 0%,
+    transparent 22rem
+  );
 }
 
 @layer components {
-  .card {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-card);
+  /* ---- layout ------------------------------------------------------------ */
+
+  /*
+   * The app's one horizontal container. Header and page body both use it, so
+   * the brand mark lines up with the content beneath it at every width.
+   *
+   * `min()` rather than a fixed max-width plus padding: it keeps the gutter
+   * honest at small sizes (the content is always exactly the viewport minus two
+   * gutters) while capping the measure on a wide display. The gutter grows with
+   * the viewport — 16px on a phone is the minimum that does not feel pinched,
+   * and 48px on a large desktop keeps the panels from floating against the
+   * screen edge.
+   *
+   * 1600px cap: a 1440px laptop then renders 1376px of content rather than the
+   * 1248px it had, and a 2560px display stops short of a measure nobody can
+   * scan across.
+   */
+  .shell {
+    width: min(100% - 2rem, 100rem);
+    margin-inline: auto;
+  }
+  @media (min-width: 640px) {
+    .shell {
+      width: min(100% - 3rem, 100rem);
+    }
+  }
+  @media (min-width: 1024px) {
+    .shell {
+      width: min(100% - 4rem, 100rem);
+    }
+  }
+  @media (min-width: 1536px) {
+    .shell {
+      width: min(100% - 6rem, 100rem);
+    }
   }
 
-  /* Cards that are also a control: lift a little on hover. */
-  .card-hover {
+  /*
+   * Prose and forms opt out of the full width — a 1376px line of body text is
+   * unreadable. Sections choose their own measure; the shell only bounds them.
+   *
+   * `measure`      — running text, ~70 characters.
+   * `measure-wide` — settings and policy pages: mostly panels and short rows,
+   *                  so they take more than prose but nothing like the shell.
+   */
+  .measure {
+    max-width: 46rem;
+  }
+  .measure-wide {
+    max-width: 60rem;
+  }
+
+  /* ---- surfaces ---------------------------------------------------------- */
+
+  .panel {
+    background-color: var(--color-panel);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-panel);
+  }
+
+  /* A panel that is also a control. Border warms rather than the whole card
+     lifting — subtler, and it does not reflow neighbours. */
+  .panel-action {
     transition:
-      transform 160ms ease,
       border-color 160ms ease,
       background-color 160ms ease;
   }
-  .card-hover:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
-    background-color: var(--color-raised);
+  .panel-action:hover {
+    border-color: color-mix(in oklab, var(--color-signal) 40%, var(--color-rule));
+    background-color: var(--color-panel-2);
   }
+
+  /* ---- type roles -------------------------------------------------------- */
+
+  /* Headings and the hero measurements. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+
+  /*
+   * Any number the eye has to compare or watch tick: timecodes, durations,
+   * axis ticks. Tabular so digits never shift width mid-update.
+   */
+  .data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'zero' 1;
+  }
+
+  /* Small structural labels above a value or section. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+
+  /* ---- controls ---------------------------------------------------------- */
 
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.75rem;
-    padding: 0.625rem 1rem;
-    min-height: 2.5rem;
+    border-radius: 0.625rem;
+    padding: 0.5625rem 0.9375rem;
+    min-height: 2.75rem;
     font-size: 0.875rem;
     font-weight: 500;
+    white-space: nowrap;
     transition:
-      transform 120ms ease,
-      opacity 120ms ease,
-      background-color 120ms ease,
-      border-color 120ms ease;
-  }
-  .btn:active {
-    transform: scale(0.97);
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease;
   }
   .btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
     pointer-events: none;
   }
 
-  .btn-primary {
-    color: #fff;
-    background-image: linear-gradient(135deg, var(--color-brand), var(--color-accent));
-    box-shadow: 0 6px 20px -8px color-mix(in oklab, var(--color-brand) 80%, transparent);
+  /* Flat sodium — no gradient. One accent, stated plainly. */
+  .btn-signal {
+    background-color: var(--color-signal);
+    color: #16120a;
+    font-weight: 600;
   }
-  .btn-primary:hover {
-    opacity: 0.92;
+  .btn-signal:hover {
+    background-color: color-mix(in oklab, var(--color-signal) 88%, #fff);
   }
 
-  .btn-ghost {
-    border: 1px solid var(--color-line);
-    color: var(--color-muted);
+  .btn-quiet {
+    border: 1px solid var(--color-rule);
+    color: var(--color-dim);
     background-color: transparent;
   }
-  .btn-ghost:hover {
-    color: var(--color-ink);
-    border-color: color-mix(in oklab, var(--color-brand) 45%, var(--color-line));
+  .btn-quiet:hover {
+    color: var(--color-text);
+    border-color: color-mix(in oklab, var(--color-signal) 40%, var(--color-rule));
   }
 
-  .input {
+  .field {
     width: 100%;
-    border-radius: 0.875rem;
-    border: 1px solid var(--color-line);
-    background-color: var(--color-surface);
+    border-radius: 0.625rem;
+    border: 1px solid var(--color-rule);
+    background-color: var(--color-panel);
+    color: var(--color-text);
     padding: 0.75rem 1rem;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     outline: none;
     transition:
       border-color 140ms ease,
       box-shadow 140ms ease;
   }
-  .input:focus {
-    border-color: var(--color-brand);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand) 22%, transparent);
+  .field::placeholder {
+    color: var(--color-dim);
+  }
+  .field:focus {
+    border-color: var(--color-signal);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-signal) 20%, transparent);
   }
 
-  /* Filter pills, category chips. */
+  /* Filter pills and category chips. */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
     border-radius: 9999px;
-    border: 1px solid var(--color-line);
-    padding: 0.5rem 0.875rem;
-    min-height: 2.5rem;
+    border: 1px solid var(--color-rule);
+    padding: 0.4375rem 0.8125rem;
+    min-height: 2.25rem;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--color-muted);
+    color: var(--color-dim);
     transition:
       color 140ms ease,
       border-color 140ms ease,
       background-color 140ms ease;
   }
   .chip:hover {
-    color: var(--color-ink);
+    color: var(--color-text);
   }
   .chip[aria-pressed='true'] {
-    color: var(--color-ink);
-    border-color: color-mix(in oklab, var(--color-brand) 55%, var(--color-line));
-    background-color: color-mix(in oklab, var(--color-brand) 14%, transparent);
+    color: var(--color-text);
+    border-color: color-mix(in oklab, var(--color-signal) 50%, var(--color-rule));
+    background-color: color-mix(in oklab, var(--color-signal) 12%, transparent);
   }
 
+  /* ---- loading ----------------------------------------------------------- */
+
   .skeleton {
-    border-radius: 0.625rem;
+    border-radius: 0.375rem;
     background: linear-gradient(
       90deg,
-      var(--color-surface) 25%,
-      var(--color-raised) 37%,
-      var(--color-surface) 63%
+      var(--color-panel) 25%,
+      var(--color-panel-2) 37%,
+      var(--color-panel) 63%
     );
     background-size: 400% 100%;
     animation: shimmer 1.4s ease-in-out infinite;
   }
 
-  /* Numbers that should read as a headline. */
-  .stat {
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+  /* ---- the signature: coverage ------------------------------------------- */
+
+  /*
+   * A coverage track is a span of time drawn true to scale. Watched regions are
+   * solid sodium at their real positions; everything else is the hollow ground
+   * showing through. This is the product's whole thesis as a graphic, and it is
+   * the same device at three scales — one video, one day, one week.
+   */
+  .track {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 0.1875rem;
+    background-color: color-mix(in oklab, var(--color-ghost) 34%, transparent);
   }
 
-  .gradient-text {
-    background-image: linear-gradient(135deg, var(--color-brand), var(--color-accent));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  /*
+   * The raster variant. Seven of these stack on the Weekly page, so the empty
+   * ground has to recede much further than it does on a single ratio bar —
+   * otherwise the unlit hours read as filled and the plot loses its figure.
+   */
+  .track-quiet {
+    background-color: color-mix(in oklab, var(--color-ghost) 15%, transparent);
+  }
+
+  /* A genuinely-played span. */
+  .track-run {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-color: var(--color-signal);
+    border-radius: 0.1875rem;
+  }
+
+  /* Reached but jumped over. Hatched rather than filled, so a skipped stretch
+     can never be mistaken for a watched one at a glance. */
+  .track-skip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--color-ghost) 0 2px,
+      transparent 2px 5px
+    );
+  }
+
+  /* Where the playhead has reached. A hairline, not a handle. */
+  .track-head {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 1px;
+    background-color: var(--color-text);
+    opacity: 0.55;
   }
 }
+
+/* ---- motion -------------------------------------------------------------- */
 
 @keyframes shimmer {
   0% {
@@ -213,45 +425,80 @@ body::before {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
     transform: none;
   }
 }
-
-/* Section content settles in on route change. Short enough not to feel laggy. */
 .animate-rise {
-  animation: rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Progress bars fill from empty on mount. */
-@keyframes grow-x {
+/* Coverage runs wipe in along the timeline, which is the direction the data
+   itself moves. */
+@keyframes wipe-x {
   from {
     transform: scaleX(0);
   }
 }
-.animate-grow {
+.animate-wipe {
   transform-origin: left;
-  animation: grow-x 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: wipe-x 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Column charts grow upward, so they need the other axis. */
-@keyframes grow-y {
+@keyframes wipe-y {
   from {
     transform: scaleY(0);
   }
 }
-.animate-grow-y {
+.animate-wipe-y {
   transform-origin: bottom;
-  animation: grow-y 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: wipe-y 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /*
- * Anyone who has asked their system to reduce motion gets none of it. The
- * layouts do not depend on animation, so switching it off changes nothing but
- * the movement.
+ * The opening figure's one orchestrated moment: a recording head runs across
+ * the example once on load, and both tracks develop behind it. Linear on
+ * purpose — a measuring head moves at a constant rate, and easing it would make
+ * the minute ruler underneath read as if it were unevenly spaced.
+ */
+@keyframes record-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.animate-record {
+  animation: record-reveal 1500ms linear both;
+}
+
+@keyframes record-head {
+  from {
+    left: 0;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  to {
+    left: 100%;
+    opacity: 0;
+  }
+}
+.animate-record-head {
+  animation: record-head 1500ms linear both;
+}
+
+/*
+ * Anyone who has asked their system to reduce motion gets none of it. No layout
+ * depends on animation, so switching it off changes only the movement.
  */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -262,7 +509,11 @@ body::before {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .card-hover:hover {
-    transform: none;
-  }
+}
+
+/* Visible keyboard focus everywhere, without a ring on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
 }

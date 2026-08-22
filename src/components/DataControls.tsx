@@ -37,10 +37,10 @@ export function DataControls() {
   const expected = pending === 'account' ? 'DELETE ACCOUNT' : 'DELETE HISTORY';
 
   return (
-    <div className="card space-y-4 p-5">
+    <div className="panel space-y-4 p-5">
       <div>
         <h2 className="text-sm font-semibold">Your data</h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-dim">
           Deletes run immediately against the database. There is no soft-delete and no backup copy
           to restore from.
         </p>
@@ -51,14 +51,14 @@ export function DataControls() {
           <button
             type="button"
             onClick={() => setPending('history')}
-            className="rounded-lg border border-line px-3 py-2 text-sm transition-colors hover:border-brand"
+            className="rounded-lg border border-rule px-3 py-2 text-sm transition-colors hover:border-signal"
           >
             Delete watch history
           </button>
           <button
             type="button"
             onClick={() => setPending('account')}
-            className="rounded-lg border border-line px-3 py-2 text-sm text-danger transition-colors hover:border-brand"
+            className="rounded-lg border border-rule px-3 py-2 text-sm text-danger transition-colors hover:border-signal"
           >
             Delete account and all data
           </button>
@@ -74,7 +74,7 @@ export function DataControls() {
             type="text"
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
-            className="w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand"
+            className="w-full rounded-lg border border-rule bg-ground px-3 py-2 text-sm outline-none focus:border-signal"
             placeholder={expected}
           />
           <div className="flex gap-2">
@@ -82,7 +82,7 @@ export function DataControls() {
               type="button"
               disabled={confirmText !== expected}
               onClick={() => void run(pending)}
-              className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="rounded-lg bg-signal px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               Confirm delete
             </button>
@@ -92,7 +92,7 @@ export function DataControls() {
                 setPending(null);
                 setConfirmText('');
               }}
-              className="rounded-lg border border-line px-3 py-2 text-sm"
+              className="rounded-lg border border-rule px-3 py-2 text-sm"
             >
               Cancel
             </button>
@@ -100,7 +100,7 @@ export function DataControls() {
         </div>
       )}
 
-      {message && <p className="text-sm text-muted">{message}</p>}
+      {message && <p className="text-sm text-dim">{message}</p>}
     </div>
   );
 }

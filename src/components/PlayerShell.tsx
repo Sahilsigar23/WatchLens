@@ -55,8 +55,12 @@ export function PlayerShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  /** Full size on the Watch page; a corner mini-player in every other section. */
-  const expanded = pathname === '/';
+  /**
+   * Full size on `/watch`; a corner mini-player in every other section —
+   * including the landing page at `/`, which is why clicking the brand mark
+   * does not interrupt playback.
+   */
+  const expanded = pathname === '/watch';
 
   const [state, setState] = useState<ShellState>(EMPTY_STATE);
   const [playlist, setPlaylist] = useState<PlaylistSummary | null>(null);
@@ -357,8 +361,15 @@ export function PlayerShell({
     <div
       className={
         expanded
-          ? 'mb-6 space-y-4'
-          : 'fixed bottom-20 right-3 z-30 w-60 space-y-2 rounded-2xl border border-line bg-surface/95 p-2 shadow-2xl backdrop-blur-xl sm:w-72 md:bottom-4'
+          ? 'mb-8 space-y-4'
+          : /*
+             * Phone: a full-width dock above the tab bar, like every mobile
+             * player. A floating corner card there covered whichever column of
+             * the analytics happened to be underneath it — a docked bar takes a
+             * predictable strip instead, which the page pads for.
+             * Desktop: the corner card, where there is room beside the content.
+             */
+            'fixed inset-x-2 bottom-[4.75rem] z-30 flex items-center gap-2.5 rounded-xl border border-rule bg-panel/95 p-1.5 shadow-2xl backdrop-blur-xl lg:inset-x-auto lg:right-6 lg:bottom-6 lg:block lg:w-64 lg:space-y-1.5'
       }
     >
       {/* Compact search sits above the player; the empty state carries its own,
@@ -367,8 +378,24 @@ export function PlayerShell({
         <VideoInput onSelectVideo={selectVideo} onSelectPlaylist={selectPlaylist} />
       )}
 
+      {/*
+        The playlist gets a fixed, readable rail rather than a third of the
+        width — a queue at 1/3 of 1248px is wider than it needs to be, and the
+        video is the point. The second column only exists when there IS a
+        playlist, otherwise the player would be squeezed for an empty gutter.
+      */}
       {playerMounted && source ? (
-        <div className={expanded ? 'grid gap-4 lg:grid-cols-3' : ''}>
+        <div
+          className={
+            expanded
+              ? playlist
+                ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-5'
+                : ''
+              : /* The video is the flex item in the phone dock, and the whole
+                   width of the card on desktop. */
+                'w-28 shrink-0 lg:w-full'
+          }
+        >
           {/*
             This wrapper's position among its siblings never changes, so React
             keeps the same DOM node and the iframe is never re-parented.
@@ -378,7 +405,7 @@ export function PlayerShell({
             without it the column is sized by its content's min-content width
             and the whole page scrolls sideways on a phone.
           */}
-          <div className={expanded ? 'min-w-0 space-y-4 lg:col-span-2' : ''}>
+          <div className={expanded ? 'min-w-0 space-y-4' : ''}>
             <YouTubePlayer
               source={source}
               initialStartSeconds={restoredPosition ?? undefined}
@@ -418,7 +445,7 @@ export function PlayerShell({
       )}
 
       {expanded && playlistError && (
-        <p className="card p-4 text-sm text-muted">{playlistError}</p>
+        <p className="panel p-4 text-sm text-dim">{playlistError}</p>
       )}
 
       {/*
@@ -431,13 +458,19 @@ export function PlayerShell({
       {!expanded && playerMounted && (
         <button
           type="button"
-          onClick={() => router.push('/')}
-          className="flex min-h-10 w-full items-center justify-between gap-2 px-2 py-1.5 text-left"
+          onClick={() => router.push('/watch')}
+          aria-label={title ? `Back to ${title}` : 'Back to Watch'}
+          className="flex min-h-9 min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left lg:w-full lg:flex-none"
         >
-          <span className="min-w-0 flex-1 truncate text-xs text-muted">
+          {/* A live tracking dot, so the mini-player states plainly that time is
+              still being measured while you are reading another section. */}
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-signal" />
+          <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-dim">
             {title || 'Back to Watch'}
           </span>
-          <span className="shrink-0 text-xs text-brand">Open ↗</span>
+          <span aria-hidden className="shrink-0 text-dim">
+            <Icon name="arrowUpRight" size={12} />
+          </span>
         </button>
       )}
     </div>

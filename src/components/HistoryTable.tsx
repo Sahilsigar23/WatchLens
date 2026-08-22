@@ -32,7 +32,7 @@ export function HistoryTable() {
   /** Loads the video into the persistent player, then shows the Watch page. */
   const watchAgain = (videoId: string) => {
     openVideo(videoId);
-    router.push('/');
+    router.push('/watch');
   };
 
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
@@ -71,7 +71,7 @@ export function HistoryTable() {
   const visible = (rows ?? []).filter((row) => filter === 'ALL' || row.category === filter);
 
   if (failed) {
-    return <p className="card p-6 text-sm text-muted">Could not load history. Try reloading.</p>;
+    return <p className="panel p-6 text-sm text-dim">Could not load history. Try reloading.</p>;
   }
 
   return (
@@ -86,7 +86,7 @@ export function HistoryTable() {
             className="chip"
           >
             {option.label}
-            {rows && <span className="text-muted">{counts[option.key]}</span>}
+            {rows && <span className="text-dim">{counts[option.key]}</span>}
           </button>
         ))}
       </div>
@@ -98,7 +98,7 @@ export function HistoryTable() {
           ))}
         </ul>
       ) : visible.length === 0 ? (
-        <p className="card p-8 text-center text-sm text-muted">
+        <p className="panel p-8 text-center text-sm text-dim">
           {rows.length === 0
             ? 'Nothing here yet. Watch something and it will appear.'
             : 'No videos in this category.'}
@@ -107,7 +107,7 @@ export function HistoryTable() {
         <ul className="space-y-3">
           {visible.map((row) => (
             <li key={row.youtubeVideoId}>
-              <article className="card card-hover overflow-hidden">
+              <article className="panel panel-action overflow-hidden">
                 <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
                   <button
                     type="button"
@@ -133,32 +133,32 @@ export function HistoryTable() {
                         <h3 className="truncate text-sm font-medium sm:text-base">
                           {row.title || row.youtubeVideoId}
                         </h3>
-                        <p className="truncate text-xs text-muted">{row.channelName}</p>
+                        <p className="truncate text-xs text-dim">{row.channelName}</p>
                       </div>
                       <CategoryBadge category={row.category} />
                     </div>
 
-                    <div className="mt-2.5 flex h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+                    <div className="mt-2.5 flex h-1.5 w-full overflow-hidden rounded-full bg-ground">
                       <div
-                        className="animate-grow h-full"
+                        className="animate-wipe h-full"
                         style={{
                           width: `${pct(row.watchedSeconds, row.durationSeconds)}%`,
                           backgroundImage:
-                            'linear-gradient(90deg, var(--color-brand), var(--color-accent))',
+                            'linear-gradient(90deg, var(--color-signal), var(--color-signal-deep))',
                         }}
                       />
                       <div
                         className="h-full"
                         style={{
                           width: `${pct(row.skippedSeconds, row.durationSeconds)}%`,
-                          background: 'var(--color-skip)',
+                          background: 'var(--color-ghost)',
                         }}
                       />
                     </div>
 
-                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                      <span className="text-ink">
-                        <span className="stat font-semibold">
+                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dim">
+                      <span className="text-text">
+                        <span className="data font-semibold">
                           {formatDuration(row.watchedSeconds)}
                         </span>
                         {row.durationSeconds > 0 && ` / ${formatDuration(row.durationSeconds)}`}

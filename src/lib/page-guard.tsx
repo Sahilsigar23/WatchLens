@@ -25,12 +25,18 @@ export async function guardSection(): Promise<ReactElement | null> {
   }
 }
 
-/** Consistent page heading, matching the Today and Weekly sections. */
+/**
+ * Consistent page heading, matching the Today and Weekly sections.
+ *
+ * The description stays sentence-case body text rather than becoming an
+ * eyebrow: the eyebrow style is uppercase mono, which is right for a two-word
+ * label and unreadable for a full sentence.
+ */
 export function SectionHeading({ title, description }: { title: string; description: string }) {
   return (
-    <header className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
+    <header className="mb-6 md:mb-8">
+      <h1 className="display text-3xl sm:text-4xl">{title}</h1>
+      <p className="mt-2 max-w-2xl text-sm text-dim">{description}</p>
     </header>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { currentStreak, loadSessions, summarizeByDay } from '@/lib/analytics';
+import { currentStreak, hourlyWatchedSeconds, loadSessions, summarizeByDay } from '@/lib/analytics';
 import { requireUserId, UnauthorizedError } from '@/lib/auth';
 import { timeZoneFromRequest, utcRangeFor, weekDatesInZone } from '@/lib/dates';
 
@@ -20,6 +20,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       days: summarizeByDay(sessions, dates, timeZone),
       streakDays: await currentStreak(userId, timeZone),
+      /*
+       * One 24-slot row per day, so the week can be drawn as a habit raster
+       * rather than seven summed columns. Additive: existing consumers of
+       * `days` / `streakDays` are untouched, the sessions are already loaded,
+       * and `hourlyWatchedSeconds` is the same pure function /today uses.
+       */
+      hourly: dates.map((date) => hourlyWatchedSeconds(sessions, date, timeZone)),
     });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
